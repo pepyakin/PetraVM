@@ -8,7 +8,7 @@ pub struct Slot(u32);
 pub struct SlotWithOffset(u32, u16);
 
 #[derive(Debug, Clone, Copy)]
-pub struct Immediate(u16);
+pub struct Immediate(u32);
 
 impl std::fmt::Display for Slot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -28,14 +28,6 @@ impl std::str::FromStr for Slot {
 impl Slot {
     pub(crate) fn get_16bfield_val(&self) -> BinaryField16b {
         BinaryField16b::new(self.0 as u16)
-    }
-
-    pub(crate) fn get_high_16bfield_val(&self) -> BinaryField16b {
-        BinaryField16b::new((self.0 >> 16) as u16)
-    }
-
-    pub(crate) fn get_32bfield_val(&self) -> BinaryField32b {
-        BinaryField32b::new(self.0)
     }
 }
 
@@ -63,10 +55,6 @@ impl SlotWithOffset {
         BinaryField16b::new(self.0 as u16)
     }
 
-    pub(crate) fn get_slot_32bfield_val(&self) -> BinaryField32b {
-        BinaryField32b::new(self.0)
-    }
-
     pub(crate) fn get_offset_field_val(&self) -> BinaryField16b {
         BinaryField16b::new(self.1)
     }
@@ -88,20 +76,24 @@ impl std::str::FromStr for Immediate {
             let v = BinaryField32b::MULTIPLICATIVE_GENERATOR.pow(int_val.unsigned_abs() as u64);
             if int_val < 0 {
                 Ok(Immediate(
-                    v.invert().expect("We already ensured v is not 0.").val() as u16,
+                    v.invert().expect("We already ensured v is not 0.").val(),
                 ))
             } else {
-                Ok(Immediate(v.val() as u16))
+                Ok(Immediate(v.val()))
             }
         } else {
-            Ok(Immediate(int_val as u16))
+            Ok(Immediate(int_val as u32))
         }
     }
 }
 
 impl Immediate {
     pub(crate) fn get_field_val(&self) -> BinaryField16b {
-        BinaryField16b::new(self.0)
+        BinaryField16b::new(self.0 as u16)
+    }
+
+    pub(crate) fn get_high_field_val(&self) -> BinaryField16b {
+        BinaryField16b::new((self.0 >> 16) as u16)
     }
 }
 

@@ -79,6 +79,51 @@ pub(crate) trait ImmediateBinaryOperation:
     }
 }
 
+pub(crate) trait NonImmediateBinaryOperation:
+    BinaryOperation<Left = BinaryField32b, Right = BinaryField32b, Output = BinaryField32b>
+{
+    // TODO: Add some trick to implement new only once
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        timestamp: u32,
+        pc: BinaryField32b,
+        fp: u32,
+        dst: u16,
+        dst_val: u32,
+        src1: u16,
+        src1_val: u32,
+        src2: u16,
+        src2_val: u32,
+    ) -> Self;
+
+    fn generate_event(
+        interpreter: &mut crate::emulator::Interpreter,
+        dst: BinaryField16b,
+        src1: BinaryField16b,
+        src2: BinaryField16b,
+    ) -> Self {
+        let src1_val = interpreter.vrom.get_u32(interpreter.fp ^ src1.val() as u32);
+        let src2_val = interpreter.vrom.get_u32(interpreter.fp ^ src2.val() as u32);
+        let dst_val = Self::operation(BinaryField32b::new(src1_val), BinaryField32b::new(src2_val));
+        let event = Self::new(
+            interpreter.timestamp,
+            interpreter.pc,
+            interpreter.fp,
+            dst.val(),
+            dst_val.val(),
+            src1.val(),
+            src1_val,
+            src2.val(),
+            src2_val,
+        );
+        interpreter
+            .vrom
+            .set_u32(interpreter.fp ^ dst.val() as u32, dst_val.val());
+        interpreter.incr_pc();
+        event
+    }
+}
+
 #[macro_export]
 macro_rules! impl_immediate_binary_operation {
     ($t:ty) => {
@@ -110,6 +155,69 @@ macro_rules! impl_immediate_binary_operation {
 }
 
 #[macro_export]
+macro_rules! impl_32b_immediate_binary_operation {
+    ($t:ty) => {
+        $crate::impl_left_right_output_for_b32imm_bin_op!($t);
+        #[allow(clippy::too_many_arguments)]
+        impl $t {
+            fn new(
+                timestamp: u32,
+                pc: BinaryField32b,
+                fp: u32,
+                dst: u16,
+                dst_val: u32,
+                src: u16,
+                src_val: u32,
+                imm: u32,
+            ) -> Self {
+                Self {
+                    timestamp,
+                    pc,
+                    fp,
+                    dst,
+                    dst_val,
+                    src,
+                    src_val,
+                    imm,
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_binary_operation {
+    ($t:ty) => {
+        $crate::impl_left_right_output_for_bin_op!($t);
+        impl $crate::event::NonImmediateBinaryOperation for $t {
+            fn new(
+                timestamp: u32,
+                pc: BinaryField32b,
+                fp: u32,
+                dst: u16,
+                dst_val: u32,
+                src1: u16,
+                src1_val: u32,
+                src2: u16,
+                src2_val: u32,
+            ) -> Self {
+                Self {
+                    timestamp,
+                    pc,
+                    fp,
+                    dst,
+                    dst_val,
+                    src1,
+                    src1_val,
+                    src2,
+                    src2_val,
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! impl_left_right_output_for_imm_bin_op {
     ($t:ty) => {
         impl $crate::event::LeftOp for $t {
@@ -123,6 +231,32 @@ macro_rules! impl_left_right_output_for_imm_bin_op {
 
             fn right(&self) -> BinaryField16b {
                 BinaryField16b::new(self.imm)
+            }
+        }
+        impl $crate::event::OutputOp for $t {
+            type Output = BinaryField32b;
+
+            fn output(&self) -> BinaryField32b {
+                BinaryField32b::new(self.dst_val)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_left_right_output_for_b32imm_bin_op {
+    ($t:ty) => {
+        impl $crate::event::LeftOp for $t {
+            type Left = BinaryField32b;
+            fn left(&self) -> BinaryField32b {
+                BinaryField32b::new(self.src_val)
+            }
+        }
+        impl $crate::event::RigthOp for $t {
+            type Right = BinaryField32b;
+
+            fn right(&self) -> BinaryField32b {
+                BinaryField32b::new(self.imm)
             }
         }
         impl $crate::event::OutputOp for $t {
