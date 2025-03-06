@@ -1,9 +1,8 @@
 use std::fmt::Debug;
 
-use binius_field::{BinaryField, BinaryField16b, BinaryField32b};
+use binius_field::{BinaryField16b, BinaryField32b};
 
 use crate::emulator::{InterpreterChannels, InterpreterTables};
-use crate::fire_non_jump_event;
 
 pub(crate) mod b32;
 pub(crate) mod branch;
@@ -42,6 +41,7 @@ pub(crate) trait ImmediateBinaryOperation:
     BinaryOperation<Left = BinaryField32b, Right = BinaryField16b, Output = BinaryField32b>
 {
     // TODO: Add some trick to implement new only once
+    #[allow(clippy::too_many_arguments)]
     fn new(
         timestamp: u32,
         pc: BinaryField32b,
@@ -66,7 +66,7 @@ pub(crate) trait ImmediateBinaryOperation:
             interpreter.pc,
             interpreter.fp,
             dst.val(),
-            dst_val.clone().val(),
+            dst_val.val(),
             src.val(),
             src_val,
             imm.into(),
@@ -82,8 +82,8 @@ pub(crate) trait ImmediateBinaryOperation:
 #[macro_export]
 macro_rules! impl_immediate_binary_operation {
     ($t:ty) => {
-        crate::impl_left_right_output_for_imm_bin_op!($t);
-        impl crate::event::ImmediateBinaryOperation for $t {
+        $crate::impl_left_right_output_for_imm_bin_op!($t);
+        impl $crate::event::ImmediateBinaryOperation for $t {
             fn new(
                 timestamp: u32,
                 pc: BinaryField32b,
@@ -101,8 +101,8 @@ macro_rules! impl_immediate_binary_operation {
                     dst,
                     dst_val,
                     src,
-                    src_val: src_val,
-                    imm: imm,
+                    src_val,
+                    imm,
                 }
             }
         }
@@ -112,20 +112,20 @@ macro_rules! impl_immediate_binary_operation {
 #[macro_export]
 macro_rules! impl_left_right_output_for_imm_bin_op {
     ($t:ty) => {
-        impl crate::event::LeftOp for $t {
+        impl $crate::event::LeftOp for $t {
             type Left = BinaryField32b;
             fn left(&self) -> BinaryField32b {
                 BinaryField32b::new(self.src_val)
             }
         }
-        impl crate::event::RigthOp for $t {
+        impl $crate::event::RigthOp for $t {
             type Right = BinaryField16b;
 
             fn right(&self) -> BinaryField16b {
                 BinaryField16b::new(self.imm)
             }
         }
-        impl crate::event::OutputOp for $t {
+        impl $crate::event::OutputOp for $t {
             type Output = BinaryField32b;
 
             fn output(&self) -> BinaryField32b {
@@ -138,20 +138,20 @@ macro_rules! impl_left_right_output_for_imm_bin_op {
 #[macro_export]
 macro_rules! impl_left_right_output_for_bin_op {
     ($t:ty) => {
-        impl crate::event::LeftOp for $t {
+        impl $crate::event::LeftOp for $t {
             type Left = BinaryField32b;
             fn left(&self) -> BinaryField32b {
                 BinaryField32b::new(self.src1_val)
             }
         }
-        impl crate::event::RigthOp for $t {
+        impl $crate::event::RigthOp for $t {
             type Right = BinaryField32b;
 
             fn right(&self) -> BinaryField32b {
                 BinaryField32b::new(self.src2_val)
             }
         }
-        impl crate::event::OutputOp for $t {
+        impl $crate::event::OutputOp for $t {
             type Output = BinaryField32b;
 
             fn output(&self) -> BinaryField32b {
@@ -164,13 +164,13 @@ macro_rules! impl_left_right_output_for_bin_op {
 #[macro_export]
 macro_rules! impl_event_for_binary_operation {
     ($ty:ty) => {
-        impl crate::event::Event for $ty {
+        impl $crate::event::Event for $ty {
             fn fire(
                 &self,
-                channels: &mut crate::emulator::InterpreterChannels,
-                _tables: &crate::emulator::InterpreterTables,
+                channels: &mut $crate::emulator::InterpreterChannels,
+                _tables: &$crate::emulator::InterpreterTables,
             ) {
-                use crate::event::{LeftOp, OutputOp, RigthOp};
+                use $crate::event::{LeftOp, OutputOp, RigthOp};
                 assert_eq!(self.output(), Self::operation(self.left(), self.right()));
                 fire_non_jump_event!(self, channels);
             }
@@ -185,7 +185,7 @@ macro_rules! fire_non_jump_event {
             .state_channel
             .pull(($intrp.pc, $intrp.fp, $intrp.timestamp));
         $channels.state_channel.push((
-            $intrp.pc * crate::emulator::G,
+            $intrp.pc * $crate::emulator::G,
             $intrp.fp,
             $intrp.timestamp + 1,
         ));

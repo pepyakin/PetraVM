@@ -1,8 +1,9 @@
 use binius_field::{BinaryField16b, BinaryField32b};
 
 use crate::{
-    emulator::{Interpreter, InterpreterChannels, InterpreterTables, G},
-    event::Event, fire_non_jump_event,
+    emulator::{Interpreter, InterpreterChannels, InterpreterTables},
+    event::Event,
+    fire_non_jump_event,
 };
 
 // Struture of an event for MVV.W.
@@ -19,6 +20,7 @@ pub(crate) struct MVVWEvent {
 }
 
 impl MVVWEvent {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         pc: BinaryField32b,
         fp: u32,
