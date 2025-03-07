@@ -5,7 +5,7 @@ use crate::{
     event::Event,
 };
 
-// Struture of an event for TAILI.
+/// Event for TAILI.
 #[derive(Debug, Clone)]
 pub(crate) struct TailiEvent {
     pc: BinaryField32b,
@@ -20,7 +20,7 @@ pub(crate) struct TailiEvent {
 
 impl TailiEvent {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub const fn new(
         pc: BinaryField32b,
         fp: u32,
         timestamp: u32,

@@ -1,5 +1,8 @@
+// TODO: Remove these once stable enough
 #![allow(unused)]
 #![allow(dead_code)]
+
+// TODO: Add doc
 
 mod emulator;
 mod event;
@@ -15,7 +18,8 @@ use instructions_with_labels::{
     get_frame_sizes_all_labels, get_full_prom_and_labels, parse_instructions,
 };
 
-pub(crate) fn get_binary_slot(i: u16) -> BinaryField16b {
+#[inline(always)]
+pub(crate) const fn get_binary_slot(i: u16) -> BinaryField16b {
     BinaryField16b::new(i)
 }
 

@@ -1,5 +1,6 @@
 use binius_field::{BinaryField16b, BinaryField32b};
 
+use super::BinaryOperation;
 use crate::{
     emulator::{Interpreter, InterpreterChannels, InterpreterTables},
     event::Event,
@@ -8,9 +9,7 @@ use crate::{
     impl_left_right_output_for_bin_op,
 };
 
-use super::BinaryOperation;
-
-// Struture of an Event for the Add32 gadget.
+/// Event for the Add64 gadget.
 #[derive(Debug, Clone)]
 pub(crate) struct Add64Event {
     timestamp: u32,
@@ -21,7 +20,7 @@ pub(crate) struct Add64Event {
 }
 
 impl Add64Event {
-    pub fn new(timestamp: u32, output: u64, input1: u64, input2: u64, cout: u64) -> Self {
+    pub const fn new(timestamp: u32, output: u64, input1: u64, input2: u64, cout: u64) -> Self {
         Self {
             timestamp,
             output,
@@ -50,7 +49,7 @@ impl Add64Event {
 
 impl_event_no_interaction_with_state_channel!(Add64Event);
 
-// Struture of an Event for the Add32 gadget.
+/// Event for the Add32 gadget.
 #[derive(Debug, Clone)]
 pub(crate) struct Add32Event {
     timestamp: u32,
@@ -61,7 +60,7 @@ pub(crate) struct Add32Event {
 }
 
 impl Add32Event {
-    pub fn new(timestamp: u32, output: u32, input1: u32, input2: u32, cout: u32) -> Self {
+    pub const fn new(timestamp: u32, output: u32, input1: u32, input2: u32, cout: u32) -> Self {
         Self {
             timestamp,
             output,
@@ -96,7 +95,7 @@ impl Add32Event {
 
 impl_event_no_interaction_with_state_channel!(Add32Event);
 
-// Struture of an event for ADDI.
+/// Event for ADDI.
 #[derive(Debug, Clone)]
 pub(crate) struct AddiEvent {
     pc: BinaryField32b,
@@ -116,7 +115,6 @@ impl BinaryOperation for AddiEvent {
 }
 
 impl_immediate_binary_operation!(AddiEvent);
-
 impl_event_for_binary_operation!(AddiEvent);
 
 impl AddiEvent {
@@ -149,7 +147,7 @@ impl AddiEvent {
     }
 }
 
-// Struture of an event for ADD.
+/// Event for ADD.
 #[derive(Debug, Clone)]
 pub(crate) struct AddEvent {
     pc: BinaryField32b,
@@ -171,10 +169,9 @@ impl BinaryOperation for AddEvent {
 
 // Note: The addition is checked thanks to the ADD32 table.
 impl_binary_operation!(AddEvent);
-
 impl_event_for_binary_operation!(AddEvent);
 
-// Struture of an event for ADDI.
+/// Event for ADDI.
 #[derive(Debug, Clone)]
 pub(crate) struct MuliEvent {
     pc: BinaryField32b,
@@ -190,13 +187,14 @@ pub(crate) struct MuliEvent {
     // Stores aux[0] + aux[1] << 8.
     pub(crate) sum0: u64,
     // Stores aux[2] + aux[3] << 8.
-    // Note: we don't need the third  sum value (equal to sum0 + sum1 <<8) because it is equal to DST_VAL.
+    // Note: we don't need the third  sum value (equal to sum0 + sum1 <<8) because it is equal to
+    // DST_VAL.
     pub(crate) sum1: u64,
 }
 
 impl MuliEvent {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub const fn new(
         pc: BinaryField32b,
         fp: u32,
         timestamp: u32,
@@ -260,7 +258,8 @@ impl MuliEvent {
     }
 }
 
-/// This function computes the intermediate sums of the schoolbook multiplication algorithm.
+/// This function computes the intermediate sums of the schoolbook
+/// multiplication algorithm.
 fn schoolbook_multiplication_intermediate_sums(
     src_val: u32,
     imm_val: u16,
@@ -283,7 +282,8 @@ fn schoolbook_multiplication_intermediate_sums(
     // sum1 = ys[1]*xs[0] + 2^8*ys[1]*xs[1] + 2^16*ys[1]*xs[2] + 2^24*ys[1]*xs[3]
     let sum1 = aux[2] as u64 + ((aux[3] as u64) << 8);
 
-    // sum = ys[0]*xs[0] + 2^8*(ys[0]*xs[1] + ys[1]*xs[0]) + 2^16*(ys[0]*xs[2] + ys[1]*xs[1]) + 2^24*(ys[0]*xs[3] + ys[1]*xs[2]) + 2^32*ys[1]*xs[3].
+    // sum = ys[0]*xs[0] + 2^8*(ys[0]*xs[1] + ys[1]*xs[0]) + 2^16*(ys[0]*xs[2] +
+    // ys[1]*xs[1]) + 2^24*(ys[0]*xs[3] + ys[1]*xs[2]) + 2^32*ys[1]*xs[3].
     assert_eq!((sum0 + (sum1 << 8)) as u32, dst_val);
     (aux, sum0, sum1)
 }

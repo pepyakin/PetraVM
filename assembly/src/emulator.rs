@@ -1,3 +1,7 @@
+//! The core zkVM emulator, that executes instructions parsed from the immutable
+//! Instruction Memory (PROM). It processes events and updates the machine state
+//! accordingly.
+
 use std::{array::from_fn, collections::HashMap, hash::Hash};
 
 use binius_field::{BinaryField, BinaryField16b, BinaryField32b, ExtensionField, Field};
@@ -24,6 +28,8 @@ pub(crate) const G: BinaryField32b = BinaryField32b::MULTIPLICATIVE_GENERATOR;
 pub struct Channel<T> {
     net_multiplicities: HashMap<T, isize>,
 }
+
+// TODO: Think on unifying types used for recurring variables (fp, pc, ...)
 
 type PromChannel = Channel<(u32, u128)>; // PC, opcode, args (so 64 bits overall).
 type VromChannel = Channel<u32>;
@@ -60,13 +66,16 @@ pub enum Opcode {
     MVVW = 0x0d,
     MVIH = 0x0e,
     LDI = 0x0f,
+    // TODO: Add missing opcodes
 }
 
 impl Opcode {
-    pub fn get_field_elt(&self) -> BinaryField16b {
+    pub const fn get_field_elt(&self) -> BinaryField16b {
         BinaryField16b::new(*self as u16)
     }
 }
+
+// TODO: Add some structured execution tracing
 
 #[derive(Debug, Default)]
 pub(crate) struct Interpreter {
@@ -99,7 +108,7 @@ pub(crate) struct ValueRom(HashMap<u32, u8>);
 pub type ProgramRom = HashMap<BinaryField32b, Instruction>;
 
 impl ValueRom {
-    pub fn new(vrom: HashMap<u32, u8>) -> Self {
+    pub const fn new(vrom: HashMap<u32, u8>) -> Self {
         Self(vrom)
     }
 
@@ -193,7 +202,7 @@ impl Interpreter {
         }
     }
 
-    pub(crate) fn new_with_vrom(
+    pub(crate) const fn new_with_vrom(
         prom: ProgramRom,
         vrom: ValueRom,
         frames: LabelsFrameSizes,
@@ -209,18 +218,22 @@ impl Interpreter {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn incr_pc(&mut self) {
         self.pc *= G;
     }
 
+    #[inline(always)]
     pub(crate) fn jump_to(&mut self, target: BinaryField32b) {
         self.pc = target;
     }
 
+    #[inline(always)]
     pub(crate) fn vrom_size(&self) -> usize {
         self.vrom.0.len()
     }
 
+    #[inline(always)]
     pub(crate) fn is_halted(&self) -> bool {
         self.pc == BinaryField32b::ZERO
     }
@@ -301,8 +314,8 @@ impl Interpreter {
     }
 
     fn generate_slli(&mut self, trace: &mut ZCrayTrace) -> Result<(), InterpreterError> {
-        // let new_shift_event = SliEventStruct::new(&self, dst, src, imm, ShiftKind::Left);
-        // new_shift_event.apply_event(self);
+        // let new_shift_event = SliEventStruct::new(&self, dst, src, imm,
+        // ShiftKind::Left); new_shift_event.apply_event(self);
         let [_, dst, src, imm] = self.prom.get(&self.pc).ok_or(InterpreterError::BadPc)?;
         let new_shift_event = SliEvent::generate_event(self, *dst, *src, *imm, ShiftKind::Left);
         trace.shift.push(new_shift_event);
@@ -440,8 +453,9 @@ impl Interpreter {
 
     // TODO: This is only a temporary method.
     fn allocate_new_frame(&mut self, target: BinaryField32b) -> Result<(), InterpreterError> {
-        // We need the +16 because the frame size we read corresponds to the largest offset accessed within the frame,
-        // and the largest possible object is a BF128.
+        // We need the +16 because the frame size we read corresponds to the largest
+        // offset accessed within the frame, and the largest possible object is
+        // a BF128.
         // TODO: Figure out the exact size of the last object.
         let (frame_size, opt_args_size) = self
             .frames
@@ -688,12 +702,11 @@ pub(crate) fn code_to_prom(code: &[Instruction]) -> ProgramRom {
 mod tests {
     use binius_field::{Field, PackedField};
 
+    use super::*;
     use crate::{
         get_full_prom_and_labels,
         instructions_with_labels::{get_frame_sizes_all_labels, parse_instructions},
     };
-
-    use super::*;
 
     #[test]
     fn test_zcray() {

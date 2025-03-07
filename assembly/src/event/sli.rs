@@ -11,7 +11,7 @@ pub enum ShiftKind {
     Right,
 }
 
-// Struture of an event for one of the shifts.
+/// Event for one of the shifts.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SliEvent {
     pc: BinaryField32b,
@@ -27,7 +27,7 @@ pub struct SliEvent {
 
 impl SliEvent {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub const fn new(
         pc: BinaryField32b,
         fp: u32,
         timestamp: u32,

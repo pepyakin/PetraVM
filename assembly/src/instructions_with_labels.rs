@@ -12,8 +12,9 @@ use crate::{
 /// This is an incomplete list of instructions
 /// So far, only the ones added for parsing the fibonacci example has been added
 ///
-/// Ideally we want another pass that removes labels, and replaces label references with
-/// the absolute program counter/instruction index we would jump to.
+/// Ideally we want another pass that removes labels, and replaces label
+/// references with the absolute program counter/instruction index we would jump
+/// to.
 #[derive(Debug)]
 pub enum InstructionsWithLabels {
     Label(String),
@@ -149,7 +150,7 @@ pub fn get_prom_inst_from_inst_with_label(
             }
             *pc *= G;
         }
-        // To change
+        // TODO: To change
         InstructionsWithLabels::B32Muli { dst, src1, imm } => {
             if prom
                 .insert(
@@ -460,7 +461,8 @@ pub fn get_frame_size_for_label(
             Opcode::try_from(instruction[0].val()).expect("PROM should be correct at this point");
     }
 
-    // We know that there was no key `label_pc` before, since it was the first thing we checked in this method.
+    // We know that there was no key `label_pc` before, since it was the first thing
+    // we checked in this method.
     labels_fps.insert(label_pc, (cur_offset, labels_args.get(&label_pc).copied()));
 
     cur_offset
