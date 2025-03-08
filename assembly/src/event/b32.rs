@@ -2,8 +2,9 @@ use binius_field::{BinaryField16b, BinaryField32b};
 
 use super::{BinaryOperation, Event};
 use crate::{
-    fire_non_jump_event, impl_32b_immediate_binary_operation, impl_binary_operation,
-    impl_event_for_binary_operation, impl_immediate_binary_operation, G,
+    event::NonImmediateBinaryOperation, fire_non_jump_event, impl_32b_immediate_binary_operation,
+    impl_binary_operation, impl_event_for_binary_operation, impl_immediate_binary_operation,
+    impl_left_right_output_for_bin_op, G,
 };
 
 /// Event for XORI.
@@ -75,6 +76,31 @@ impl BinaryOperation for AndiEvent {
 impl_immediate_binary_operation!(AndiEvent);
 impl_event_for_binary_operation!(AndiEvent);
 
+/// Event for B32_MUL.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct B32MulEvent {
+    timestamp: u32,
+    pc: BinaryField32b,
+    fp: u32,
+    dst: u16,
+    dst_val: u32,
+    src1: u16,
+    src1_val: u32,
+    src2: u16,
+    src2_val: u32,
+}
+
+impl BinaryOperation for B32MulEvent {
+    #[inline(always)]
+    fn operation(val1: BinaryField32b, val2: BinaryField32b) -> BinaryField32b {
+        val1 * val2
+    }
+}
+
+impl_binary_operation!(B32MulEvent);
+impl_event_for_binary_operation!(B32MulEvent);
+
+/// Event for B32_MULI.
 #[derive(Debug, Default, Clone)]
 pub(crate) struct B32MuliEvent {
     timestamp: u32,
