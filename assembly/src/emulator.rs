@@ -22,6 +22,7 @@ use crate::{
         NonImmediateBinaryOperation, // Add the import for RetEvent
     },
     instructions_with_labels::LabelsFrameSizes,
+    opcodes::Opcode,
 };
 
 pub(crate) const G: BinaryField32b = BinaryField32b::MULTIPLICATIVE_GENERATOR;
@@ -45,38 +46,6 @@ type VromTable32 = HashMap<u32, u32>;
 #[derive(Default)]
 pub struct InterpreterTables {
     pub vrom_table_32: VromTable32,
-}
-
-#[derive(Debug, Clone, Copy, Default, TryFromPrimitive, IntoPrimitive, PartialEq, Eq)]
-#[repr(u16)]
-#[allow(clippy::upper_case_acronyms)]
-// TODO: Add missing opcodes
-// TODO: Adjust opcode discriminants. Consider Deref to account for aliases?
-pub enum Opcode {
-    #[default]
-    Bnz = 0x01,
-    Xori = 0x02,
-    Xor = 0x03,
-    Andi = 0x04,
-    Srli = 0x05,
-    Slli = 0x06,
-    Addi = 0x07,
-    Add = 0x08,
-    Muli = 0x09,
-    B32Muli = 0x0a,
-    Ret = 0x0b,
-    Taili = 0x0c,
-    MVVW = 0x0d,
-    MVIH = 0x0e,
-    LDI = 0x0f,
-    B32Mul = 0x10,
-    MVVL = 0x11,
-}
-
-impl Opcode {
-    pub const fn get_field_elt(&self) -> BinaryField16b {
-        BinaryField16b::new(*self as u16)
-    }
 }
 
 // TODO: Add some structured execution tracing
@@ -600,6 +569,7 @@ pub(crate) struct ZCrayTrace {
     b32_mul: Vec<B32MulEvent>,
     b32_muli: Vec<B32MuliEvent>,
     add: Vec<AddEvent>,
+
     vrom: ValueRom,
 }
 
@@ -607,6 +577,16 @@ pub(crate) struct BoundaryValues {
     final_pc: BinaryField32b,
     final_fp: u32,
     timestamp: u32,
+}
+
+/// Convenience macro to `fire` all events logged.
+/// This will execute all the flushes that these events trigger.
+macro_rules! fire_events {
+    ($events:expr, $channels:expr, $tables:expr) => {
+        $events
+            .iter()
+            .for_each(|event| event.fire($channels, $tables));
+    };
 }
 
 impl ZCrayTrace {
@@ -660,81 +640,25 @@ impl ZCrayTrace {
             boundary_values.timestamp,
         ));
 
-        self.bnz
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.bz
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.xor
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.xori
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.andi
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.shift
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.addi
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.add
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.add32
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.add64
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.muli
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.b32_mul
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.b32_muli
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.ldi
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.taili
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.ret
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.mvvw
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.mvvl
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
-
-        self.mvih
-            .iter()
-            .for_each(|event| event.fire(&mut channels, &tables));
+        fire_events!(self.bnz, &mut channels, &tables);
+        fire_events!(self.bz, &mut channels, &tables);
+        fire_events!(self.xor, &mut channels, &tables);
+        fire_events!(self.xori, &mut channels, &tables);
+        fire_events!(self.andi, &mut channels, &tables);
+        fire_events!(self.shift, &mut channels, &tables);
+        fire_events!(self.addi, &mut channels, &tables);
+        fire_events!(self.add, &mut channels, &tables);
+        fire_events!(self.add32, &mut channels, &tables);
+        fire_events!(self.add64, &mut channels, &tables);
+        fire_events!(self.muli, &mut channels, &tables);
+        fire_events!(self.b32_mul, &mut channels, &tables);
+        fire_events!(self.b32_muli, &mut channels, &tables);
+        fire_events!(self.ldi, &mut channels, &tables);
+        fire_events!(self.taili, &mut channels, &tables);
+        fire_events!(self.ret, &mut channels, &tables);
+        fire_events!(self.mvvw, &mut channels, &tables);
+        fire_events!(self.mvvl, &mut channels, &tables);
+        fire_events!(self.mvih, &mut channels, &tables);
 
         assert!(channels.state_channel.is_balanced());
     }
