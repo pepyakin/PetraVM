@@ -8,7 +8,7 @@ collatz:
     ;; Slot @20: Local: n == 1
     ;; Slot @24: Local: n % 2
     ;; Slot @28: Local: 3*n
-    ;; Slot @32: Local: n >> 2 or 3*n + 1
+    ;; Slot @32: Local: n >> 1 or 3*n + 1
 
     ;; Branch to recursion label if value in slot 8 is not 1
     XORI @20, @8, #1
@@ -18,7 +18,7 @@ collatz:
 
 case_recurse:
     ANDI @24, @8, #1  ;; n % 2 is & 0x00..01
-    BNZ case_odd, @24 ;; branch if n % 2 == 0u32
+    BNZ case_odd, @24 ;; branch if n % 2 == 1u32
 
     ;; case even
     ;; n >> 1
