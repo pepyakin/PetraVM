@@ -20,10 +20,13 @@ pub struct RetEvent {
 }
 
 impl RetEvent {
-    pub fn new(interpreter: &Interpreter) -> Result<Self, InterpreterError> {
+    pub fn new(
+        interpreter: &Interpreter,
+        field_pc: BinaryField32b,
+    ) -> Result<Self, InterpreterError> {
         let fp = interpreter.fp;
         Ok(Self {
-            pc: interpreter.pc,
+            pc: field_pc,
             fp,
             timestamp: interpreter.timestamp,
             fp_0_val: interpreter.vrom.get_u32(fp)?,
@@ -31,10 +34,13 @@ impl RetEvent {
         })
     }
 
-    pub fn generate_event(interpreter: &mut Interpreter) -> Result<Self, InterpreterError> {
+    pub fn generate_event(
+        interpreter: &mut Interpreter,
+        field_pc: BinaryField32b,
+    ) -> Result<Self, InterpreterError> {
         let fp = interpreter.fp;
 
-        let ret_event = RetEvent::new(interpreter);
+        let ret_event = RetEvent::new(interpreter, field_pc);
         interpreter.jump_to(BinaryField32b::new(interpreter.vrom.get_u32(fp)?));
         interpreter.fp = interpreter.vrom.get_u32(fp + 4)?;
 

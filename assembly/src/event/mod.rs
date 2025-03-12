@@ -7,7 +7,10 @@ use std::fmt::Debug;
 
 use binius_field::{BinaryField16b, BinaryField32b};
 
-use crate::emulator::{InterpreterChannels, InterpreterError, InterpreterTables};
+use crate::{
+    emulator::{InterpreterChannels, InterpreterError, InterpreterTables},
+    ZCrayTrace,
+};
 
 pub(crate) mod b128;
 pub(crate) mod b32;
@@ -64,9 +67,11 @@ pub(crate) trait ImmediateBinaryOperation:
 
     fn generate_event(
         interpreter: &mut crate::emulator::Interpreter,
+        trace: &mut ZCrayTrace,
         dst: BinaryField16b,
         src: BinaryField16b,
         imm: BinaryField16b,
+        field_pc: BinaryField32b,
     ) -> Result<Self, InterpreterError> {
         let src_val = interpreter
             .vrom
@@ -74,7 +79,7 @@ pub(crate) trait ImmediateBinaryOperation:
         let dst_val = Self::operation(BinaryField32b::new(src_val), imm);
         let event = Self::new(
             interpreter.timestamp,
-            interpreter.pc,
+            field_pc,
             interpreter.fp,
             dst.val(),
             dst_val.val(),
@@ -84,7 +89,7 @@ pub(crate) trait ImmediateBinaryOperation:
         );
         interpreter
             .vrom
-            .set_u32(interpreter.fp ^ dst.val() as u32, dst_val.val())?;
+            .set_u32(trace, interpreter.fp ^ dst.val() as u32, dst_val.val())?;
         interpreter.incr_pc();
         Ok(event)
     }
@@ -108,9 +113,11 @@ pub(crate) trait NonImmediateBinaryOperation:
 
     fn generate_event(
         interpreter: &mut crate::emulator::Interpreter,
+        trace: &mut ZCrayTrace,
         dst: BinaryField16b,
         src1: BinaryField16b,
         src2: BinaryField16b,
+        field_pc: BinaryField32b,
     ) -> Result<Self, InterpreterError> {
         let src1_val = interpreter
             .vrom
@@ -121,7 +128,7 @@ pub(crate) trait NonImmediateBinaryOperation:
         let dst_val = Self::operation(BinaryField32b::new(src1_val), BinaryField32b::new(src2_val));
         let event = Self::new(
             interpreter.timestamp,
-            interpreter.pc,
+            field_pc,
             interpreter.fp,
             dst.val(),
             dst_val.val(),
@@ -132,7 +139,7 @@ pub(crate) trait NonImmediateBinaryOperation:
         );
         interpreter
             .vrom
-            .set_u32(interpreter.fp ^ dst.val() as u32, dst_val.val())?;
+            .set_u32(trace, interpreter.fp ^ dst.val() as u32, dst_val.val())?;
         interpreter.incr_pc();
         Ok(event)
     }

@@ -4,7 +4,7 @@ use super::Event;
 use crate::{
     emulator::{Interpreter, InterpreterChannels, InterpreterError, InterpreterTables},
     event::BinaryOperation,
-    fire_non_jump_event, G,
+    fire_non_jump_event, ZCrayTrace, G,
 };
 
 /// Event for B128_ADD.
@@ -29,9 +29,11 @@ pub(crate) struct B128AddEvent {
 impl B128AddEvent {
     pub fn generate_event(
         interpreter: &mut Interpreter,
+        trace: &mut ZCrayTrace,
         dst: BinaryField16b,
         src1: BinaryField16b,
         src2: BinaryField16b,
+        field_pc: BinaryField32b,
     ) -> Result<Self, InterpreterError> {
         let fp = interpreter.fp;
 
@@ -48,7 +50,7 @@ impl B128AddEvent {
         let dst_val = src1_val ^ src2_val;
 
         // Store result
-        interpreter.vrom.set_u128(dst_addr, dst_val)?;
+        interpreter.vrom.set_u128(trace, dst_addr, dst_val)?;
 
         let pc = interpreter.pc;
         let timestamp = interpreter.timestamp;
@@ -56,7 +58,7 @@ impl B128AddEvent {
 
         Ok(Self {
             timestamp,
-            pc,
+            pc: field_pc,
             fp,
             dst: dst.val(),
             dst_val,
@@ -138,9 +140,11 @@ pub(crate) struct B128MulEvent {
 impl B128MulEvent {
     pub fn generate_event(
         interpreter: &mut Interpreter,
+        trace: &mut ZCrayTrace,
         dst: BinaryField16b,
         src1: BinaryField16b,
         src2: BinaryField16b,
+        field_pc: BinaryField32b,
     ) -> Result<Self, InterpreterError> {
         let fp = interpreter.fp;
 
@@ -160,7 +164,7 @@ impl B128MulEvent {
         let dst_val = dst_bf.val();
 
         // Store result
-        interpreter.vrom.set_u128(dst_addr, dst_val)?;
+        interpreter.vrom.set_u128(trace, dst_addr, dst_val)?;
 
         let pc = interpreter.pc;
         let timestamp = interpreter.timestamp;
@@ -168,7 +172,7 @@ impl B128MulEvent {
 
         Ok(Self {
             timestamp,
-            pc,
+            pc: field_pc,
             fp,
             dst: dst.val(),
             dst_val,
