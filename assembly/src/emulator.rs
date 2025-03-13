@@ -59,6 +59,18 @@ pub struct InterpreterTables {
 
 // TODO: Add some structured execution tracing
 
+/// Represents the data needed to create a move event later
+pub(crate) type ToSetValue = (
+    u32,            // parent addr
+    Opcode,         // operation code
+    BinaryField32b, // field PC
+    u32,            // fp
+    u32,            // timestamp
+    BinaryField16b, // dst
+    BinaryField16b, // src
+    BinaryField16b, // offset
+);
+
 #[derive(Debug, Default)]
 pub(crate) struct Interpreter {
     /// The integer PC represents to the exponent of the actual field
@@ -72,6 +84,14 @@ pub(crate) struct Interpreter {
     pub(crate) prom: ProgramRom,
     pub(crate) vrom: ValueRom,
     frames: LabelsFrameSizes,
+    /// HashMap used to set values and push MV events during a CALL procedure.
+    /// When a MV occurs with a value that isn't set within a CALL procedure, we
+    /// assume it is a return value. Then, we add (addr_next_frame,
+    /// to_set_value) to `to_set`, where `to_set_value` contains enough
+    /// information to create a move event later. Whenever an address in the
+    /// HashMap's keys is finally set, we populate the missing values and
+    /// remove them from the HashMap.
+    to_set: HashMap<u32, ToSetValue>,
     /// Before a CALL, there are a few move operations used to populate the next
     /// frame. But the next frame pointer is not necessarily known at this
     /// point, and return values may also not be known. Thus, this `Vec` is
@@ -145,6 +165,7 @@ impl Interpreter {
             vrom: ValueRom::default(),
             frames,
             pc_field_to_int,
+            to_set: HashMap::new(),
             moves_to_apply: vec![],
         }
     }
@@ -163,6 +184,7 @@ impl Interpreter {
             vrom,
             frames,
             pc_field_to_int,
+            to_set: HashMap::new(),
             moves_to_apply: vec![],
         }
     }
@@ -783,6 +805,120 @@ impl Interpreter {
             .ok_or(InterpreterError::InvalidInput)?;
         Ok(self.vrom.allocate_new_frame(*frame_size as u32))
     }
+
+    /// Insert a value to be set later
+    ///
+    /// Maps a destination address to a ToSetValue which contains necessary
+    /// information to create a move event once the value is available.
+    pub(crate) fn insert_to_set(
+        &mut self,
+        dst: u32,
+        to_set_val: ToSetValue,
+    ) -> Result<(), InterpreterError> {
+        if self.to_set.insert(dst, to_set_val).is_some() {
+            return Err(InterpreterError::VromRewrite(dst));
+        }
+        Ok(())
+    }
+
+    /// Attempts to get a u32 value from VROM, returning None if the value is
+    /// pending in to_set
+    ///
+    /// This method is used in move operations to determine if a value is
+    /// available or still waiting to be set.
+    pub(crate) fn get_vrom_u32_move(&self, index: u32) -> Result<Option<u32>, InterpreterError> {
+        if self.to_set.contains_key(&index) {
+            // Value is pending, not available yet
+            Ok(None)
+        } else {
+            // Try to get the value from VROM
+            match self.vrom.get_u32(index) {
+                Ok(value) => Ok(Some(value)),
+                Err(e) => Err(e),
+            }
+        }
+    }
+
+    /// Attempts to get a u128 value from VROM, returning None if the value is
+    /// pending in to_set
+    ///
+    /// This method is used in move operations to determine if a value is
+    /// available or still waiting to be set.
+    pub(crate) fn get_vrom_u128_move(&self, index: u32) -> Result<Option<u128>, InterpreterError> {
+        if self.to_set.contains_key(&index) {
+            // Value is pending, not available yet
+            Ok(None)
+        } else {
+            // Try to get the value from VROM
+            match self.vrom.get_u128(index) {
+                Ok(value) => Ok(Some(value)),
+                Err(e) => Err(e),
+            }
+        }
+    }
+
+    /// Sets a value of any integer type and handles pending to_set entries
+    ///
+    /// This generic method works with u8, u16, and u32 values. It stores the
+    /// value in VROM and processes any dependent values in to_set.
+    pub(crate) fn set_vrom<T>(
+        &mut self,
+        trace: &mut ZCrayTrace,
+        index: u32,
+        value: T,
+    ) -> Result<(), InterpreterError>
+    where
+        T: Copy + Into<u32> + Into<u128>,
+    {
+        // Convert to u32 for storage
+        let u32_value: u32 = value.into();
+
+        // Set the value in VROM
+        self.vrom.set_value(index, u32_value)?;
+
+        // Handle any pending to_set entries for this index
+        if let Some((parent, opcode, field_pc, fp, timestamp, dst, src, offset)) =
+            self.to_set.remove(&index)
+        {
+            self.set_vrom(trace, parent, u32_value)?;
+            let event_out = MVEventOutput::new(
+                parent,
+                opcode,
+                field_pc,
+                fp,
+                timestamp,
+                dst,
+                src,
+                offset,
+                u128::from(u32_value),
+            );
+            event_out.push_mv_event(trace);
+        }
+        Ok(())
+    }
+
+    /// Sets a u128 value and handles pending to_set entries
+    pub(crate) fn set_vrom_u128(
+        &mut self,
+        trace: &mut ZCrayTrace,
+        index: u32,
+        value: u128,
+    ) -> Result<(), InterpreterError> {
+        // Set the value in VROM
+        self.vrom.set_u128(index, value)?;
+
+        // Handle any pending to_set entries for this index
+        if let Some((parent, opcode, field_pc, fp, timestamp, dst, src, offset)) =
+            self.to_set.remove(&index)
+        {
+            self.set_vrom_u128(trace, parent, value)?;
+            let event_out = MVEventOutput::new(
+                parent, opcode, field_pc, fp, timestamp, dst, src, offset, value,
+            );
+            event_out.push_mv_event(trace);
+        }
+        Ok(())
+    }
 }
 
 impl<T: Hash + Eq + Debug> Channel<T> {
@@ -1066,9 +1202,6 @@ mod tests {
 
         let prom = code_to_prom(&instructions, &vec![false; instructions.len()]);
 
-        // Create a dummy trace only used to populate the initial VROM.
-        let mut dummy_zcray = ZCrayTrace::default();
-
         //  ;; Frame:
         // 	;; Slot @0: Return PC
         // 	;; Slot @1: Return FP
@@ -1079,10 +1212,10 @@ mod tests {
         //  ;; Slot @6: Local: dst2
         let mut vrom = ValueRom::default();
         vrom.allocate_new_frame(6);
-        vrom.set_u32(&mut dummy_zcray, 0, 0);
-        vrom.set_u32(&mut dummy_zcray, 1, 0);
-        vrom.set_u32(&mut dummy_zcray, 3, 2);
-        vrom.set_u32(&mut dummy_zcray, 5, 3);
+        vrom.set_value(0, 0u32);
+        vrom.set_value(1, 0u32);
+        vrom.set_value(3, 2u32);
+        vrom.set_value(5, 3u32);
 
         let (traces, _) = ZCrayTrace::generate_with_vrom(prom, vrom, frames, HashMap::new())
             .expect("Trace generation should not fail.");
