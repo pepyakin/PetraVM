@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
-use crate::{execution::InterpreterError, vrom_allocator::VromAllocator};
+use binius_field::{BinaryField16b, BinaryField32b};
 
-/// ValueRom represents a memory structure for storing different sized values
-#[derive(Debug, Default)]
+use super::MemoryError;
+use crate::{memory::VromAllocator, opcodes::Opcode};
+
+/// `ValueRom` represents a memory structure for storing different sized values.
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ValueRom {
     /// Storage for values, each slot is a u32
     vrom: Vec<u32>,
@@ -11,44 +14,82 @@ pub(crate) struct ValueRom {
     vrom_allocator: VromAllocator,
     /// Initial values to populate new frames
     init_values: Vec<u32>,
+    /// `HashMap` used to hold pending values to be set when pushing MOVE events
+    /// during a CALL procedure.
+    ///
+    /// When a MOVE occurs with a value that isn't set within a CALL procedure,
+    /// we assume it is a return value. Then, we add `(addr_next_frame,
+    /// to_set_value)` to `pending_updates`, where `to_set_value` contains
+    /// enough information to create a move event later. Whenever an address
+    /// in the HashMap's keys is finally set, we populate the missing values
+    /// and remove them from the map.
+    pub(crate) pending_updates: VromPendingUpdates,
 }
 
-impl ValueRom {
-    /// Create a new ValueRom with initial values
-    pub fn new_with_init_values(vals: Vec<u32>) -> Self {
-        Self {
-            vrom: Vec::new(),
-            vrom_allocator: VromAllocator::default(),
-            init_values: vals,
-        }
-    }
+pub(crate) type VromPendingUpdates = HashMap<u32, VromUpdate>;
 
-    /// Create an empty ValueRom
+/// Represents the data needed to create a move event later.
+pub(crate) type VromUpdate = (
+    u32,            // parent addr
+    Opcode,         // operation code
+    BinaryField32b, // field pc
+    u32,            // fp
+    u32,            // timestamp
+    BinaryField16b, // dst
+    BinaryField16b, // src
+    BinaryField16b, // offset
+);
+
+impl ValueRom {
+    /// Creates an empty `ValueRom`.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set a value at the specified index
-    /// The value will be stored as a u32 regardless of its original size
+    /// Creates a new `ValueRom` with initial values.
+    pub fn new_with_init_values(vals: Vec<u32>) -> Self {
+        Self {
+            init_values: vals,
+            ..Default::default()
+        }
+    }
+
+    /// Inserts a pending value to be set later.
+    ///
+    /// Maps a destination address to a `VromUpdate` which contains necessary
+    /// information to create a MOVE event once the value is available.
+    pub(crate) fn insert_pending(
+        &mut self,
+        dst: u32,
+        to_set_val: VromUpdate,
+    ) -> Result<(), MemoryError> {
+        if self.pending_updates.insert(dst, to_set_val).is_some() {
+            return Err(MemoryError::VromRewrite(dst));
+        }
+        Ok(())
+    }
+
+    /// Sets a value at the specified index.
+    /// The value will be stored as a `u32` regardless of its original size.
     pub(crate) fn set_value<T: Into<u32>>(
         &mut self,
         index: u32,
         value: T,
-    ) -> Result<(), InterpreterError> {
+    ) -> Result<(), MemoryError> {
         self.check_bounds(index)?;
 
         let u32_value = value.into();
         let prev_val = self.vrom[index as usize];
         if prev_val != 0 && prev_val != u32_value {
-            return Err(InterpreterError::VromRewrite(index));
+            return Err(MemoryError::VromRewrite(index));
         }
 
         self.vrom[index as usize] = u32_value;
         Ok(())
     }
 
-    /// Set a u128 value at the specified index
-    pub(crate) fn set_u128(&mut self, index: u32, value: u128) -> Result<(), InterpreterError> {
+    /// Sets a `u128` value at the specified index.
+    pub(crate) fn set_u128(&mut self, index: u32, value: u128) -> Result<(), MemoryError> {
         self.check_alignment(index, 4)?;
 
         // For u128, we need to store it across multiple u32 slots (4 slots)
@@ -60,7 +101,7 @@ impl ValueRom {
 
             let prev_val = self.vrom[idx as usize];
             if prev_val != 0 && prev_val != u32_val {
-                return Err(InterpreterError::VromRewrite(idx));
+                return Err(MemoryError::VromRewrite(idx));
             }
 
             self.vrom[idx as usize] = u32_val;
@@ -68,26 +109,26 @@ impl ValueRom {
         Ok(())
     }
 
-    /// Get a u8 value from the specified index
-    pub(crate) fn get_u8(&self, index: u32) -> Result<u8, InterpreterError> {
+    /// Gets a `u8` value from the specified index.
+    pub(crate) fn get_u8(&self, index: u32) -> Result<u8, MemoryError> {
         self.check_bounds(index)?;
         Ok(self.vrom[index as usize] as u8)
     }
 
-    /// Get a u16 value from the specified index
-    pub(crate) fn get_u16(&self, index: u32) -> Result<u16, InterpreterError> {
+    /// Gets a `u16` value from the specified index.
+    pub(crate) fn get_u16(&self, index: u32) -> Result<u16, MemoryError> {
         self.check_bounds(index)?;
         Ok(self.vrom[index as usize] as u16)
     }
 
-    /// Get a u32 value from the specified index
-    pub(crate) fn get_u32(&self, index: u32) -> Result<u32, InterpreterError> {
+    /// Gets a `u32` value from the specified index.
+    pub(crate) fn get_u32(&self, index: u32) -> Result<u32, MemoryError> {
         self.check_bounds(index)?;
         Ok(self.vrom[index as usize])
     }
 
-    /// Get a u128 value from the specified index
-    pub(crate) fn get_u128(&self, index: u32) -> Result<u128, InterpreterError> {
+    /// Gets a `u128` value from the specified index.
+    pub(crate) fn get_u128(&self, index: u32) -> Result<u128, MemoryError> {
         self.check_alignment(index, 4)?;
 
         // For u128, we need to read from multiple u32 slots (4 slots)
@@ -126,19 +167,19 @@ impl ValueRom {
         pos
     }
 
-    /// Check if the index is within bounds
-    fn check_bounds(&self, index: u32) -> Result<(), InterpreterError> {
+    /// Checks if the index is within bounds.
+    fn check_bounds(&self, index: u32) -> Result<(), MemoryError> {
         if index as usize >= self.vrom.len() {
-            Err(InterpreterError::VromMissingValue(index))
+            Err(MemoryError::VromMissingValue(index))
         } else {
             Ok(())
         }
     }
 
-    /// Check if the index has proper alignment
-    fn check_alignment(&self, index: u32, alignment: u32) -> Result<(), InterpreterError> {
+    /// Checks if the index has proper alignment.
+    fn check_alignment(&self, index: u32, alignment: u32) -> Result<(), MemoryError> {
         if index % alignment != 0 {
-            Err(InterpreterError::VromMisaligned(
+            Err(MemoryError::VromMisaligned(
                 alignment.try_into().unwrap(),
                 index,
             ))
@@ -231,7 +272,7 @@ mod tests {
         let result = vrom.set_value(0, 43u32);
         assert!(result.is_err());
 
-        if let Err(InterpreterError::VromRewrite(index)) = result {
+        if let Err(MemoryError::VromRewrite(index)) = result {
             assert_eq!(index, 0);
         } else {
             panic!("Expected VromRewrite error");
@@ -256,7 +297,7 @@ mod tests {
         let result = vrom.set_u128(0, u128_val_2);
         assert!(result.is_err());
 
-        if let Err(InterpreterError::VromRewrite(index)) = result {
+        if let Err(MemoryError::VromRewrite(index)) = result {
             assert_eq!(index, 0); // The least significant 32-bit chunk differs
         } else {
             panic!("Expected VromRewrite error");
@@ -271,7 +312,7 @@ mod tests {
         let result = vrom.get_u32(0);
         assert!(result.is_err());
 
-        if let Err(InterpreterError::VromMissingValue(index)) = result {
+        if let Err(MemoryError::VromMissingValue(index)) = result {
             assert_eq!(index, 0);
         } else {
             panic!("Expected VromMissingValue error");
@@ -287,7 +328,7 @@ mod tests {
         let result = vrom.set_u128(1, 0);
         assert!(result.is_err());
 
-        if let Err(InterpreterError::VromMisaligned(alignment, index)) = result {
+        if let Err(MemoryError::VromMisaligned(alignment, index)) = result {
             assert_eq!(alignment, 4);
             assert_eq!(index, 1);
         } else {
