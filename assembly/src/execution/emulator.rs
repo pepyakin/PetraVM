@@ -134,7 +134,12 @@ impl Interpreter {
 
     #[inline(always)]
     pub(crate) const fn incr_pc(&mut self) {
-        self.pc += 1;
+        if self.pc == u32::MAX {
+            // Skip over 0, as it is inaccessible in the multiplicative group.
+            self.pc = 1
+        } else {
+            self.pc += 1;
+        }
     }
 
     #[inline(always)]
@@ -152,9 +157,9 @@ impl Interpreter {
     /// This method should only be called once the frame pointer has been
     /// allocated. It is used to generate events -- whenever possible --
     /// once the next_fp has been set by the allocator. When it is not yet
-    /// possible to generate the move event (because we are dealing with a
+    /// possible to generate the MOVE event (because we are dealing with a
     /// return value that has not yet been set), we add the move information to
-    /// `self.to_set`, so that it can be generated later on.
+    /// the trace's `pending_updates`, so that it can be generated later on.
     pub(crate) fn handles_call_moves(
         &mut self,
         trace: &mut ZCrayTrace,
@@ -336,7 +341,7 @@ impl Interpreter {
     ) -> Result<(), InterpreterError> {
         let target = (BinaryField32b::from_bases([target_low, target_high]))
             .map_err(|_| InterpreterError::InvalidInput)?;
-        let cond_val = trace.memory.get_vrom_u32(self.fp ^ cond.val() as u32)?;
+        let cond_val = trace.get_vrom_u32(self.fp ^ cond.val() as u32)?;
         if cond_val != 0 {
             let new_bnz_event = BnzEvent::generate_event(self, trace, cond, target, field_pc)?;
             trace.bnz.push(new_bnz_event);
@@ -746,67 +751,14 @@ impl Interpreter {
             .frames
             .get(&target)
             .ok_or(InterpreterError::InvalidInput)?;
-        Ok(trace
-            .memory
-            .vrom_mut()
-            .allocate_new_frame(*frame_size as u32))
-    }
-
-    /// Sets a value of any integer type and handles pending to_set entries
-    ///
-    /// This generic method works with u8, u16, and u32 values. It stores the
-    /// value in VROM and processes any dependent values in to_set.
-    pub(crate) fn set_vrom<T>(
-        &self,
-        trace: &mut ZCrayTrace,
-        index: u32,
-        value: T,
-    ) -> Result<(), InterpreterError>
-    where
-        T: Copy + Into<u32> + Into<u128>,
-    {
-        // Handle any pending entry for this index.
-        if let Some((parent, opcode, field_pc, fp, timestamp, dst, src, offset)) =
-            trace.memory.set_vrom(index, value)?
-        {
-            let event_out = MVEventOutput::new(
-                parent,
-                opcode,
-                field_pc,
-                fp,
-                timestamp,
-                dst,
-                src,
-                offset,
-                value.into(),
-            );
-            event_out.push_mv_event(trace);
-        }
-        Ok(())
-    }
-
-    /// Sets a u128 value and handles pending to_set entries
-    pub(crate) fn set_vrom_u128(
-        &self,
-        trace: &mut ZCrayTrace,
-        index: u32,
-        value: u128,
-    ) -> Result<(), InterpreterError> {
-        // Handle any pending to_set entries for this index.
-        if let Some((parent, opcode, field_pc, fp, timestamp, dst, src, offset)) =
-            trace.memory.set_vrom_u128(index, value)?
-        {
-            let event_out = MVEventOutput::new(
-                parent, opcode, field_pc, fp, timestamp, dst, src, offset, value,
-            );
-            event_out.push_mv_event(trace);
-        }
-        Ok(())
+        Ok(trace.vrom_mut().allocate_new_frame(*frame_size as u32))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use num_traits::WrappingAdd;
+
     use super::*;
     use crate::parser::parse_program;
     use crate::util::{collatz_orbits, init_logger};
@@ -833,7 +785,7 @@ mod tests {
         let zero = BinaryField16b::zero();
         let code = vec![[Opcode::Ret.get_field_elt(), zero, zero, zero]];
         let prom = code_to_prom(&code, &[false]);
-        let memory = Memory::new(prom, ValueRom::new());
+        let memory = Memory::new(prom, ValueRom::new_with_init_vals(&[0, 0]));
 
         let mut frames = HashMap::new();
         frames.insert(BinaryField32b::ONE, 12);
@@ -1005,7 +957,7 @@ mod tests {
 
         let prom = code_to_prom(&instructions, &is_calling_procedure_hints);
         // return PC = 0, return FP = 0, n = 5
-        let vrom = ValueRom::new_with_init_values(vec![0, 0, initial_val]);
+        let vrom = ValueRom::new_with_init_vals(&[0, 0, initial_val]);
 
         let memory = Memory::new(prom, vrom);
 
@@ -1045,12 +997,12 @@ mod tests {
 
         for i in 0..nb_frames {
             assert_eq!(
-                traces.memory.get_vrom_u32(i as u32 * 16 + 4).unwrap(), // next_fp (slot 4)
-                ((i + 1) * 16) as u32                                   // next_fp_val
+                traces.get_vrom_u32(i as u32 * 16 + 4).unwrap(), // next_fp (slot 4)
+                ((i + 1) * 16) as u32                            // next_fp_val
             );
             assert_eq!(
-                traces.memory.get_vrom_u32(i as u32 * 16 + 2).unwrap(), // n (slot 2)
-                cur_val                                                 // n_val
+                traces.get_vrom_u32(i as u32 * 16 + 2).unwrap(), // n (slot 2)
+                cur_val                                          // n_val
             );
 
             if cur_val % 2 == 0 {
@@ -1059,6 +1011,9 @@ mod tests {
                 cur_val = 3 * cur_val + 1;
             }
         }
+
+        // Check return value.
+        assert_eq!(traces.get_vrom_u32(3).unwrap(), 1);
     }
 
     #[test]
@@ -1083,7 +1038,7 @@ mod tests {
         let initial_value = G.pow(init_val as u64).val();
 
         // Set initial PC, FP and argument.
-        let vrom = ValueRom::new_with_init_values(vec![0, 0, initial_value]);
+        let vrom = ValueRom::new_with_init_vals(&[0, 0, initial_value]);
         let memory = Memory::new(prom, vrom);
 
         let (traces, _) = ZCrayTrace::generate(memory, frame_sizes, pc_field_to_int)
@@ -1092,49 +1047,48 @@ mod tests {
         // Check that Fibonacci is computed properly.
         let fib_power_two_frame_size = 16;
         let mut cur_fibs = [0, 1];
+        // Check all intermediary values.
         for i in 0..init_val {
-            let s = cur_fibs[0] + cur_fibs[1];
+            let s = cur_fibs[0].wrapping_add(&cur_fibs[1]);
             assert_eq!(
                 traces
-                    .memory
-                    .vrom()
-                    .get_u32((i + 1) * fib_power_two_frame_size + 2)
+                    .get_vrom_u32((i + 1) * fib_power_two_frame_size + 2)
                     .unwrap(),
                 cur_fibs[0],
                 "left {} right {}",
                 traces
-                    .memory
-                    .vrom()
-                    .get_u32((i + 1) * fib_power_two_frame_size + 2)
+                    .get_vrom_u32((i + 1) * fib_power_two_frame_size + 2)
                     .unwrap(),
                 cur_fibs[0]
             );
             assert_eq!(
                 traces
-                    .memory
-                    .vrom()
-                    .get_u32((i + 1) * fib_power_two_frame_size + 3)
+                    .get_vrom_u32((i + 1) * fib_power_two_frame_size + 3)
                     .unwrap(),
                 cur_fibs[1]
             );
             assert_eq!(
                 traces
-                    .memory
-                    .vrom()
-                    .get_u32((i + 1) * fib_power_two_frame_size + 7)
+                    .get_vrom_u32((i + 1) * fib_power_two_frame_size + 7)
                     .unwrap(),
                 s
             );
             cur_fibs[0] = cur_fibs[1];
             cur_fibs[1] = s;
         }
+        // Check the final return value.
         assert_eq!(
             traces
-                .memory
-                .vrom()
-                .get_u32((init_val + 1) * fib_power_two_frame_size + 5)
+                .get_vrom_u32((init_val + 1) * fib_power_two_frame_size + 5)
                 .unwrap(),
             cur_fibs[0]
+        );
+        // Check that the returned value is propagated correctly.
+        assert_eq!(
+            traces
+                .get_vrom_u32((init_val + 1) * fib_power_two_frame_size + 5)
+                .unwrap(),
+            traces.get_vrom_u32(3).unwrap()
         );
     }
 }

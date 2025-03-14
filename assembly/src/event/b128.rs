@@ -43,14 +43,14 @@ impl B128AddEvent {
         let src2_addr = fp ^ src2.val() as u32;
 
         // Get source values
-        let src1_val = trace.memory.get_vrom_u128(src1_addr)?;
-        let src2_val = trace.memory.get_vrom_u128(src2_addr)?;
+        let src1_val = trace.get_vrom_u128(src1_addr)?;
+        let src2_val = trace.get_vrom_u128(src2_addr)?;
 
         // In binary fields, addition is XOR
         let dst_val = src1_val ^ src2_val;
 
         // Store result
-        interpreter.set_vrom_u128(trace, dst_addr, dst_val)?;
+        trace.set_vrom_u128(dst_addr, dst_val)?;
 
         let pc = interpreter.pc;
         let timestamp = interpreter.timestamp;
@@ -154,8 +154,8 @@ impl B128MulEvent {
         let src2_addr = fp ^ src2.val() as u32;
 
         // Get source values
-        let src1_val = trace.memory.get_vrom_u128(src1_addr)?;
-        let src2_val = trace.memory.get_vrom_u128(src2_addr)?;
+        let src1_val = trace.get_vrom_u128(src1_addr)?;
+        let src2_val = trace.get_vrom_u128(src2_addr)?;
 
         // Binary field multiplication
         let src1_bf = BinaryField128b::new(src1_val);
@@ -164,7 +164,7 @@ impl B128MulEvent {
         let dst_val = dst_bf.val();
 
         // Store result
-        interpreter.set_vrom_u128(trace, dst_addr, dst_val)?;
+        trace.set_vrom_u128(dst_addr, dst_val)?;
 
         let pc = interpreter.pc;
         let timestamp = interpreter.timestamp;
@@ -318,9 +318,6 @@ mod tests {
         let b_val = 0x5555555566666666u128 | (0x7777777788888888u128 << 64);
         let c_val = 0x9999999988888888u128 | (0x7777777766666666u128 << 64);
 
-        // Create a dummy trace only used to populate the initial VROM.
-        let mut dummy_zcray = ZCrayTrace::default();
-
         let mut init_values = vec![
             // Return PC and FP
             0,
@@ -342,19 +339,12 @@ mod tests {
             c_val as u32,         // 0x88888888
             (c_val >> 32) as u32, // 0x99999999
             (c_val >> 64) as u32, // 0x66666666
-            (c_val >> 96) as u32, // 0x77777777
-            // Space for results (8 more slots for add_result and mul_result)
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
+            (c_val >> 96) as u32, /* 0x77777777
+                                   * Space for results (8 more slots for add_result and
+                                   * mul_result) */
         ];
 
-        let vrom = ValueRom::new_with_init_values(init_values);
+        let vrom = ValueRom::new_with_init_vals(&init_values);
         let memory = Memory::new(prom, vrom);
 
         // Set up frame sizes
@@ -380,8 +370,8 @@ mod tests {
         let expected_mul = (add_result_bf * c_bf).val();
 
         // Verify the results in VROM
-        let actual_add = trace.memory.get_vrom_u128(add_result_offset).unwrap();
-        let actual_mul = trace.memory.get_vrom_u128(mul_result_offset).unwrap();
+        let actual_add = trace.get_vrom_u128(add_result_offset).unwrap();
+        let actual_mul = trace.get_vrom_u128(mul_result_offset).unwrap();
 
         assert_eq!(actual_add, expected_add, "B128_ADD operation failed");
         assert_eq!(actual_mul, expected_mul, "B128_MUL operation failed");

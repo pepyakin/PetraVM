@@ -33,8 +33,8 @@ impl RetEvent {
             pc: field_pc,
             fp,
             timestamp: interpreter.timestamp,
-            fp_0_val: trace.memory.get_vrom_u32(fp)?,
-            fp_1_val: trace.memory.get_vrom_u32(fp + 1)?,
+            fp_0_val: trace.get_vrom_u32(fp)?,
+            fp_1_val: trace.get_vrom_u32(fp ^ 1)?,
         })
     }
 
@@ -46,8 +46,8 @@ impl RetEvent {
         let fp = interpreter.fp;
 
         let ret_event = RetEvent::new(interpreter, trace, field_pc);
-        interpreter.jump_to(BinaryField32b::new(trace.memory.get_vrom_u32(fp)?));
-        interpreter.fp = trace.memory.get_vrom_u32(fp + 1)?;
+        interpreter.jump_to(BinaryField32b::new(trace.get_vrom_u32(fp)?));
+        interpreter.fp = trace.get_vrom_u32(fp + 1)?;
 
         ret_event
     }
