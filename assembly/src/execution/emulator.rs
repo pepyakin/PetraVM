@@ -18,17 +18,17 @@ use crate::{
         branch::{BnzEvent, BzEvent},
         call::{TailVEvent, TailiEvent},
         integer_ops::{Add32Event, Add64Event, AddEvent, AddiEvent, MuliEvent},
-        mv::{LDIEvent, MVEventOutput, MVIHEvent, MVInfo, MVKind, MVVLEvent, MVVWEvent},
+        mv::{LDIEvent, MVIHEvent, MVInfo, MVKind, MVVLEvent, MVVWEvent},
         ret::RetEvent,
         sli::{ShiftKind, SliEvent},
         ImmediateBinaryOperation,
         NonImmediateBinaryOperation, // Add the import for RetEvent
     },
     execution::StateChannel,
-    memory::{Memory, MemoryError},
+    execution::ZCrayTrace,
+    memory::{Memory, MemoryError, ProgramRom, ValueRom},
     opcodes::Opcode,
     parser::LabelsFrameSizes,
-    ProgramRom, ValueRom, ZCrayTrace,
 };
 
 pub(crate) const G: BinaryField32b = BinaryField32b::MULTIPLICATIVE_GENERATOR;
@@ -73,8 +73,8 @@ pub(crate) struct Interpreter {
 /// to be used by this operation.
 pub(crate) type Instruction = [BinaryField16b; 4];
 
-#[derive(Debug, Default, PartialEq)]
-pub(crate) struct InterpreterInstruction {
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct InterpreterInstruction {
     pub(crate) instruction: Instruction,
     pub(crate) field_pc: BinaryField32b,
     /// Hint given by the compiler to let us know whether the current
@@ -100,7 +100,7 @@ impl InterpreterInstruction {
 }
 
 #[derive(Debug)]
-pub(crate) enum InterpreterError {
+pub enum InterpreterError {
     InvalidOpcode,
     BadPc,
     InvalidInput,
@@ -115,7 +115,7 @@ impl From<MemoryError> for InterpreterError {
 }
 
 #[derive(Debug)]
-pub(crate) enum InterpreterException {}
+pub enum InterpreterException {}
 
 impl Interpreter {
     pub(crate) const fn new(
@@ -760,9 +760,9 @@ mod tests {
     use num_traits::WrappingAdd;
 
     use super::*;
-    use crate::parser::parse_program;
+    use crate::parser::{get_full_prom_and_labels, parse_program};
+    use crate::util::get_binary_slot;
     use crate::util::{collatz_orbits, init_logger};
-    use crate::{get_binary_slot, get_full_prom_and_labels};
 
     pub(crate) fn code_to_prom(
         code: &[Instruction],
