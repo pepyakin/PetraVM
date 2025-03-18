@@ -20,12 +20,11 @@ use crate::{
         integer_ops::{Add32Event, Add64Event, AddEvent, AddiEvent, MuliEvent},
         mv::{LDIEvent, MVIHEvent, MVInfo, MVKind, MVVLEvent, MVVWEvent},
         ret::RetEvent,
-        sli::{ShiftKind, SliEvent},
+        shift::{ShiftEvent, ShiftOperation},
         ImmediateBinaryOperation,
         NonImmediateBinaryOperation, // Add the import for RetEvent
     },
-    execution::StateChannel,
-    execution::ZCrayTrace,
+    execution::{StateChannel, ZCrayTrace},
     memory::{Memory, MemoryError, ProgramRom, ValueRom},
     opcodes::Opcode,
     parser::LabelsFrameSizes,
@@ -273,6 +272,18 @@ impl Interpreter {
             Opcode::Srli => {
                 self.generate_srli(trace, field_pc, is_call_procedure, arg0, arg1, arg2)?
             }
+            Opcode::Srai => {
+                self.generate_srai(trace, field_pc, is_call_procedure, arg0, arg1, arg2)?
+            }
+            Opcode::Sll => {
+                self.generate_sll(trace, field_pc, is_call_procedure, arg0, arg1, arg2)?
+            }
+            Opcode::Srl => {
+                self.generate_srl(trace, field_pc, is_call_procedure, arg0, arg1, arg2)?
+            }
+            Opcode::Sra => {
+                self.generate_sra(trace, field_pc, is_call_procedure, arg0, arg1, arg2)?
+            }
             Opcode::Addi => {
                 self.generate_addi(trace, field_pc, is_call_procedure, arg0, arg1, arg2)?
             }
@@ -407,12 +418,19 @@ impl Interpreter {
         src: BinaryField16b,
         imm: BinaryField16b,
     ) -> Result<(), InterpreterError> {
-        let new_shift_event =
-            SliEvent::generate_event(self, trace, dst, src, imm, ShiftKind::Left, field_pc)?;
-        trace.shift.push(new_shift_event);
-
+        let new_shift_event = ShiftEvent::generate_immediate_event(
+            self,
+            trace,
+            dst,
+            src,
+            imm,
+            ShiftOperation::LogicalLeft,
+            field_pc,
+        )?;
+        trace.shifts.push(new_shift_event);
         Ok(())
     }
+
     fn generate_srli(
         &mut self,
         trace: &mut ZCrayTrace,
@@ -422,10 +440,104 @@ impl Interpreter {
         src: BinaryField16b,
         imm: BinaryField16b,
     ) -> Result<(), InterpreterError> {
-        let new_shift_event =
-            SliEvent::generate_event(self, trace, dst, src, imm, ShiftKind::Right, field_pc)?;
-        trace.shift.push(new_shift_event);
+        let new_shift_event = ShiftEvent::generate_immediate_event(
+            self,
+            trace,
+            dst,
+            src,
+            imm,
+            ShiftOperation::LogicalRight,
+            field_pc,
+        )?;
+        trace.shifts.push(new_shift_event);
+        Ok(())
+    }
 
+    fn generate_srai(
+        &mut self,
+        trace: &mut ZCrayTrace,
+        field_pc: BinaryField32b,
+        _: bool,
+        dst: BinaryField16b,
+        src: BinaryField16b,
+        imm: BinaryField16b,
+    ) -> Result<(), InterpreterError> {
+        let new_shift_event = ShiftEvent::generate_immediate_event(
+            self,
+            trace,
+            dst,
+            src,
+            imm,
+            ShiftOperation::ArithmeticRight,
+            field_pc,
+        )?;
+        trace.shifts.push(new_shift_event);
+        Ok(())
+    }
+
+    fn generate_sll(
+        &mut self,
+        trace: &mut ZCrayTrace,
+        field_pc: BinaryField32b,
+        _: bool,
+        dst: BinaryField16b,
+        src1: BinaryField16b,
+        src2: BinaryField16b,
+    ) -> Result<(), InterpreterError> {
+        let new_shift_event = ShiftEvent::generate_vrom_event(
+            self,
+            trace,
+            dst,
+            src1,
+            src2,
+            ShiftOperation::LogicalLeft,
+            field_pc,
+        )?;
+        trace.shifts.push(new_shift_event);
+        Ok(())
+    }
+
+    fn generate_srl(
+        &mut self,
+        trace: &mut ZCrayTrace,
+        field_pc: BinaryField32b,
+        _: bool,
+        dst: BinaryField16b,
+        src1: BinaryField16b,
+        src2: BinaryField16b,
+    ) -> Result<(), InterpreterError> {
+        let new_shift_event = ShiftEvent::generate_vrom_event(
+            self,
+            trace,
+            dst,
+            src1,
+            src2,
+            ShiftOperation::LogicalRight,
+            field_pc,
+        )?;
+        trace.shifts.push(new_shift_event);
+        Ok(())
+    }
+
+    fn generate_sra(
+        &mut self,
+        trace: &mut ZCrayTrace,
+        field_pc: BinaryField32b,
+        _: bool,
+        dst: BinaryField16b,
+        src1: BinaryField16b,
+        src2: BinaryField16b,
+    ) -> Result<(), InterpreterError> {
+        let new_shift_event = ShiftEvent::generate_vrom_event(
+            self,
+            trace,
+            dst,
+            src1,
+            src2,
+            ShiftOperation::ArithmeticRight,
+            field_pc,
+        )?;
+        trace.shifts.push(new_shift_event);
         Ok(())
     }
 
@@ -972,12 +1084,12 @@ mod tests {
         traces.validate(boundary_values);
 
         assert!(
-            traces.shift.len() == expected_evens.len(),
+            traces.shifts.len() == expected_evens.len(),
             "Generated an incorrect number of even cases."
         );
         for (i, &even) in expected_evens.iter().enumerate() {
             assert!(
-                traces.shift[i].src_val == even,
+                traces.shifts[i].src_val == even,
                 "Incorrect input to an even case."
             );
         }
