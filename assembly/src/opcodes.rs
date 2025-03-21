@@ -1,7 +1,11 @@
 use binius_field::BinaryField16b;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use strum::EnumCount;
+use strum_macros::EnumCount;
 
-#[derive(Debug, Clone, Copy, Default, TryFromPrimitive, IntoPrimitive, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, Default, EnumCount, TryFromPrimitive, IntoPrimitive, PartialEq, Eq,
+)]
 #[repr(u16)]
 #[allow(clippy::upper_case_acronyms)]
 // TODO: Add missing opcodes
@@ -52,8 +56,8 @@ pub enum Opcode {
     Ret = 0x0b,
 
     // Branch instructions
-    #[default]
     Bnz = 0x01,
+
     // Memory Access (RAM) instructions
     // TODO: optional ISA extension for future implementation
     // Not needed for recursion program or first version of zCrayVM
@@ -66,9 +70,12 @@ pub enum Opcode {
     // LHU,
     // SB,
     // SH,
+    #[default]
+    Invalid = 0x00,
 }
 
 impl Opcode {
+    pub const OP_COUNT: usize = Self::COUNT - 1;
     pub const fn get_field_elt(&self) -> BinaryField16b {
         BinaryField16b::new(*self as u16)
     }
