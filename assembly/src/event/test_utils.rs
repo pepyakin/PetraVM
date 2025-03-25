@@ -37,3 +37,10 @@ impl TestEnv {
             .unwrap();
     }
 }
+
+/// Sets a value at the given VROM offset and returns a BinaryField16b for that
+/// offset
+pub fn vrom_set_value_at_offset(vrom: &mut ValueRom, offset: u16, value: u32) -> BinaryField16b {
+    vrom.set_u32(offset as u32, value).unwrap();
+    BinaryField16b::new(offset)
+}
