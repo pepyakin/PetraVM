@@ -57,6 +57,7 @@ pub(crate) struct Interpreter {
     /// 1, and 0 can be the halting value.
     pub(crate) pc: u32,
     pub(crate) fp: u32,
+    /// The system timestamp. Only RAM operations increase it.
     pub(crate) timestamp: u32,
     frames: LabelsFrameSizes,
     /// Before a CALL, there are a few move operations used to populate the next
@@ -250,7 +251,13 @@ impl Interpreter {
         debug_assert_eq!(field_pc, G.pow(self.pc as u64 - 1));
 
         let opcode = Opcode::try_from(opcode.val()).map_err(|_| InterpreterError::InvalidOpcode)?;
-        trace!("Executing {:?} at timestamp {:?}", opcode, self.timestamp);
+        trace!(
+            "Executing {:?} with args {:?}",
+            opcode,
+            (1..1 + opcode.num_args())
+                .map(|i| instruction.instruction[i].val())
+                .collect::<Vec<_>>()
+        );
         match opcode {
             Opcode::Bnz => self.generate_bnz(trace, field_pc, arg0, arg1, arg2)?,
             Opcode::Jumpi => self.generate_jumpi(trace, field_pc, arg0, arg1, arg2)?,
@@ -293,7 +300,6 @@ impl Interpreter {
             Opcode::B128Mul => self.generate_b128_mul(trace, field_pc, arg0, arg1, arg2)?,
             Opcode::Invalid => return Err(InterpreterError::InvalidOpcode),
         }
-        self.timestamp += 1;
         Ok(Some(()))
     }
 
@@ -773,7 +779,6 @@ impl Interpreter {
         &mut self,
         trace: &mut ZCrayTrace,
         field_pc: BinaryField32b,
-
         dst: BinaryField16b,
         src1: BinaryField16b,
         src2: BinaryField16b,
