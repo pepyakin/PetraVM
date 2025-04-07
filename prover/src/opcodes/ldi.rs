@@ -61,7 +61,7 @@ impl LdiTable {
 
         let vrom_abs_addr = table.add_computed("abs_addr", fp + upcast_col(dst));
 
-        // Push value to VROM write table using absolute address
+        // Pull value to VROM write table using absolute address
         let imm = table.add_computed("imm", pack_b16_into_b32([imm_low.into(), imm_high.into()]));
         table.pull(channels.vrom_channel, [vrom_abs_addr, imm]);
 
