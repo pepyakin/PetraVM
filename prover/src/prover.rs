@@ -19,6 +19,7 @@ use crate::{circuit::Circuit, model::Trace, types::ProverPackedField};
 
 const LOG_INV_RATE: usize = 1;
 const SECURITY_BITS: usize = 100;
+pub(crate) const VROM_MULTIPLICITY_BITS: usize = 8;
 
 /// Main prover for zCrayVM.
 // TODO: should be customizable by supported opcodes
@@ -87,7 +88,7 @@ impl Prover {
         // 4. Fill VROM skip table with skipped addresses
         // Generate the list of skipped addresses (addresses not in vrom_writes)
         let write_addrs: std::collections::HashSet<u32> =
-            trace.vrom_writes.iter().map(|(addr, _)| *addr).collect();
+            trace.vrom_writes.iter().map(|(addr, _, _)| *addr).collect();
 
         let vrom_skips: Vec<u32> = (0..vrom_size as u32)
             .filter(|addr| !write_addrs.contains(addr))
@@ -95,11 +96,9 @@ impl Prover {
 
         witness.fill_table_sequential(&self.circuit.vrom_skip_table, &vrom_skips)?;
 
-        // 5. Fill LDI table with load immediate events
         witness.fill_table_sequential(&self.circuit.ldi_table, trace.ldi_events())?;
-
-        // 6. Fill RET table with return events
         witness.fill_table_sequential(&self.circuit.ret_table, trace.ret_events())?;
+        witness.fill_table_sequential(&self.circuit.b32_mul_table, trace.b32_mul_events())?;
 
         // 7. Fill BNZ table with branch not zero events
         witness.fill_table_sequential(&self.circuit.bnz_table, trace.bnz_events())?;
