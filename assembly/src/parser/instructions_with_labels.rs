@@ -307,4 +307,7 @@ pub enum Error {
 
     #[error("You must have at least one label and one instruction")]
     NoStartLabelOrInstructionFound,
+
+    #[error(transparent)]
+    PestParse(#[from] Box<pest::error::Error<super::Rule>>),
 }
