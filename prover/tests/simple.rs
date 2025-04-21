@@ -268,6 +268,66 @@ fn generate_simple_taili_trace() -> Result<Trace> {
     generate_test_trace(asm_code, init_values, vrom_writes)
 }
 
+// Creates a basic execution trace with just ANDI and RET instructions.
+///
+/// # Returns
+/// * A Trace containing an ANDI instruction followed by a RET instruction
+fn generate_andi_ret_trace() -> Result<Trace> {
+    // Create a simple assembly program with ANDI and RET
+    // Note: Format follows the grammar requirements:
+    // - Program must start with a label followed by an instruction
+    // - Used framesize for stack allocation
+    let asm_code = "#[framesize(0x10)]\n\
+        _start: ANDI @3, @2, #2\n\
+        RET\n"
+        .to_string();
+
+    trace!("asm_code:\n {:?}", asm_code);
+
+    let init_values = [0, 0, 1];
+
+    let vrom_writes = vec![
+        // Initial values
+        (0, 0, 1),
+        (1, 0, 1),
+        (2, 1, 1),
+        // ANDI event
+        (3, 1 & 2, 1),
+    ];
+
+    generate_test_trace(asm_code, init_values, vrom_writes)
+}
+
+/// Creates a basic execution trace with just ANDI and RET instructions.
+///
+/// # Returns
+/// * A Trace containing an ANDI instruction followed by a RET instruction
+fn generate_xori_ret_trace() -> Result<Trace> {
+    // Create a simple assembly program with ANDI and RET
+    // Note: Format follows the grammar requirements:
+    // - Program must start with a label followed by an instruction
+    // - Used framesize for stack allocation
+    let asm_code = "#[framesize(0x10)]\n\
+        _start: XORI @3, @2, #2\n\
+        RET\n"
+        .to_string();
+
+    trace!("asm_code:\n {:?}", asm_code);
+
+    let init_values = [0, 0, 1];
+
+    let vrom_writes = vec![
+        // Initial values
+        (0, 0, 1),
+        (1, 0, 1),
+        (2, 1, 1),
+        // XORI event
+        (3, 1 ^ 2, 1),
+    ];
+
+    generate_test_trace(asm_code, init_values, vrom_writes)
+}
+
 fn test_from_trace_generator<F, G>(trace_generator: F, check_events: G) -> Result<()>
 where
     F: FnOnce() -> Result<Trace>,
@@ -438,6 +498,38 @@ fn test_simple_taili_loop() -> Result<()> {
             trace.bz_events().len(),
             1,
             "Should have exactly one BZ event"
+        );
+    })
+}
+
+#[test]
+fn test_andi_ret() -> Result<()> {
+    test_from_trace_generator(generate_andi_ret_trace, |trace| {
+        assert_eq!(
+            trace.andi_events().len(),
+            1,
+            "Should have exactly one LDI event"
+        );
+        assert_eq!(
+            trace.ret_events().len(),
+            1,
+            "Should have exactly one RET event"
+        );
+    })
+}
+
+#[test]
+fn test_xori_ret() -> Result<()> {
+    test_from_trace_generator(generate_xori_ret_trace, |trace| {
+        assert_eq!(
+            trace.xori_events().len(),
+            1,
+            "Should have exactly one bz event"
+        );
+        assert_eq!(
+            trace.ret_events().len(),
+            1,
+            "Should have exactly one RET event"
         );
     })
 }
