@@ -249,7 +249,11 @@ impl_table_info_and_accessor!(
     (XoriEvent, XoriTable, xori_events, xori),
     (AddEvent, AddTable, add_events, add),
     (TailiEvent, TailiTable, taili_events, taili),
-    (MvvwEvent, MvvwTable, mvvw_events, mvvw)
+    (MvvwEvent, MvvwTable, mvvw_events, mvvw),
+    (AndEvent, AndTable, and_events, and),
+    (XorEvent, XorTable, xor_events, xor),
+    (OrEvent, OrTable, or_events, or),
+    (OriEvent, OriTable, ori_events, ori),
 );
 
 // Map all opcodes to their related event and table.
@@ -265,4 +269,8 @@ define_table_registry!(
     (MvvwEvent, MvvwTable, Mvvw),
     (AndiEvent, AndiTable, Andi),
     (XoriEvent, XoriTable, Xori),
+    (AndEvent, AndTable, And),
+    (XorEvent, XorTable, Xor),
+    (OrEvent, OrTable, Or),
+    (OriEvent, OriTable, Ori),
 );

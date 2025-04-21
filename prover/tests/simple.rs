@@ -386,6 +386,193 @@ fn test_ldi_b32_mul_ret() -> Result<()> {
     )
 }
 
+// Creates a basic execution trace with just AND and RET instructions.
+///
+/// # Returns
+/// * A Trace containing an AND instruction followed by a RET instruction
+fn generate_and_ret_trace() -> Result<Trace> {
+    // Create a simple assembly program with AND and RET
+    // Note: Format follows the grammar requirements:
+    // - Program must start with a label followed by an instruction
+    // - Used framesize for stack allocation
+    let asm_code = "#[framesize(0x10)]\n\
+        _start: AND @4, @3, @2\n\
+        RET\n"
+        .to_string();
+
+    trace!("asm_code:\n {:?}", asm_code);
+
+    let init_values = [0, 0, 1, 2];
+
+    let vrom_writes = vec![
+        // Initial values
+        (0, 0, 1),
+        (1, 0, 1),
+        (2, 1, 1),
+        (3, 2, 1),
+        // AND event
+        (4, 1 & 2, 1),
+    ];
+
+    generate_test_trace(asm_code, init_values, vrom_writes)
+}
+
+#[test]
+fn test_and_ret() -> Result<()> {
+    test_from_trace_generator(generate_and_ret_trace, |trace| {
+        assert_eq!(
+            trace.and_events().len(),
+            1,
+            "Should have exactly one AND event"
+        );
+        assert_eq!(
+            trace.ret_events().len(),
+            1,
+            "Should have exactly one RET event"
+        );
+    })
+}
+
+// Creates a basic execution trace with just XOR and RET instructions.
+///
+/// # Returns
+/// * A Trace containing an XOR instruction followed by a RET instruction
+fn generate_xor_ret_trace() -> Result<Trace> {
+    // Create a simple assembly program with XOR and RET
+    // Note: Format follows the grammar requirements:
+    // - Program must start with a label followed by an instruction
+    // - Used framesize for stack allocation
+    let asm_code = "#[framesize(0x10)]\n\
+        _start: XOR @4, @3, @2\n\
+        RET\n"
+        .to_string();
+
+    trace!("asm_code:\n {:?}", asm_code);
+
+    let init_values = [0, 0, 7, 42];
+
+    let vrom_writes = vec![
+        // Initial values
+        (0, 0, 1),
+        (1, 0, 1),
+        (2, 7, 1),
+        (3, 42, 1),
+        // XOR event
+        (4, 42 ^ 7, 1),
+    ];
+
+    generate_test_trace(asm_code, init_values, vrom_writes)
+}
+
+// Creates a basic execution trace with just OR and RET instructions.
+///
+/// # Returns
+/// * A Trace containing an OR instruction followed by a RET instruction
+fn generate_or_ret_trace() -> Result<Trace> {
+    // Create a simple assembly program with OR and RET
+    // Note: Format follows the grammar requirements:
+    // - Program must start with a label followed by an instruction
+    // - Used framesize for stack allocation
+    let asm_code = "#[framesize(0x10)]\n\
+        _start: OR @4, @3, @2\n\
+        RET\n"
+        .to_string();
+
+    trace!("asm_code:\n {:?}", asm_code);
+
+    let init_values = [0, 0, 7, 42];
+
+    let vrom_writes = vec![
+        // Initial values
+        (0, 0, 1),
+        (1, 0, 1),
+        (2, 7, 1),
+        (3, 42, 1),
+        // OR event
+        (4, 42 | 7, 1),
+    ];
+
+    generate_test_trace(asm_code, init_values, vrom_writes)
+}
+
+// Creates a basic execution trace with just ORI and RET instructions.
+///
+/// # Returns
+/// * A Trace containing an ORI instruction followed by a RET instruction
+fn generate_ori_ret_trace() -> Result<Trace> {
+    // Create a simple assembly program with OR and RET
+    // Note: Format follows the grammar requirements:
+    // - Program must start with a label followed by an instruction
+    // - Used framesize for stack allocation
+    let asm_code = "#[framesize(0x10)]\n\
+        _start: ORI @3, @2, #7\n\
+        RET\n"
+        .to_string();
+
+    trace!("asm_code:\n {:?}", asm_code);
+
+    let init_values = [0, 0, 42];
+
+    let vrom_writes = vec![
+        // Initial values
+        (0, 0, 1),
+        (1, 0, 1),
+        (2, 42, 1),
+        // ORI event
+        (3, 42 | 7, 1),
+    ];
+
+    generate_test_trace(asm_code, init_values, vrom_writes)
+}
+
+#[test]
+fn test_xor_ret() -> Result<()> {
+    test_from_trace_generator(generate_xor_ret_trace, |trace| {
+        assert_eq!(
+            trace.xor_events().len(),
+            1,
+            "Should have exactly one XOR event"
+        );
+        assert_eq!(
+            trace.ret_events().len(),
+            1,
+            "Should have exactly one RET event"
+        );
+    })
+}
+
+#[test]
+fn test_or_ret() -> Result<()> {
+    test_from_trace_generator(generate_or_ret_trace, |trace| {
+        assert_eq!(
+            trace.or_events().len(),
+            1,
+            "Should have exactly one OR event"
+        );
+        assert_eq!(
+            trace.ret_events().len(),
+            1,
+            "Should have exactly one RET event"
+        );
+    })
+}
+
+#[test]
+fn test_ori_ret() -> Result<()> {
+    test_from_trace_generator(generate_ori_ret_trace, |trace| {
+        assert_eq!(
+            trace.ori_events().len(),
+            1,
+            "Should have exactly one ORI event"
+        );
+        assert_eq!(
+            trace.ret_events().len(),
+            1,
+            "Should have exactly one RET event"
+        );
+    })
+}
+
 #[test]
 fn test_bnz_non_zero_branch_ret() -> Result<()> {
     test_from_trace_generator(
