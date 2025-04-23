@@ -7,81 +7,68 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use binius_m3::builder::B32;
+use paste::paste;
 use zcrayvm_assembly::{event::*, InterpreterInstruction, Opcode, ZCrayTrace};
 
 use crate::table::*;
 
-/// Implements the [`TableInfo`](crate::table::TableInfo) trait that lifts
+/// Implements the [`TableInfo`] trait that lifts
 /// [`InstructionInfo`](zcrayvm_assembly::InstructionInfo) and maps events to
 /// their corresponding field in the [`ZCrayTrace`], as well as corresponding
 /// event accessors for the main [`Trace`].
 ///
+/// It will also implement the mapping between an [`Opcode`] and its associated
+/// [`Table`].
+///
 /// # Example
 ///
 /// ```ignore
-/// impl_table_info_and_accessor!(
-///     (LDIEvent, LdiTable, ldi_events, ldi),
-///     (RetEvent, RetTable, ret_events, ret),
+/// define_table_registry_and_accessors!(
+///     (ldi, Ldi),
+///     (ret, Ret),
 /// );
 /// ```
-macro_rules! impl_table_info_and_accessor {
+macro_rules! define_table_registry_and_accessors {
     (
-        $(
-            ($event_type:ty, $table_type:ty, $accessor:ident,  $func_name:ident)
-        ),* $(,)?
+        $(($func_name:ident, $opcode_variant:ident)),* $(,)?
     ) => {
         $(
-            impl Trace {
-                #[doc = concat!("Returns a reference to the logged `", stringify!($event_type), "`s from the trace.")]
-                pub fn $accessor(&self) -> &[$event_type] {
-                    &self.trace.$func_name
+            paste! {
+                impl Trace {
+                    #[doc = concat!("Returns a reference to the logged `", stringify!([<$opcode_variant Event>]), "`s from the trace.")]
+                    pub fn [<$func_name _events>](&self) -> &[ [<$opcode_variant Event>] ] {
+                        &self.trace.$func_name
+                    }
                 }
-            }
 
-            impl $crate::table::TableInfo for $event_type {
-                type Table = $table_type;
+                impl TableInfo for [<$opcode_variant Event>] {
+                    type Table = [<$opcode_variant Table>];
 
-                fn accessor() -> fn(&Trace) -> &[<$table_type as $crate::table::Table>::Event] {
-                    Trace::$accessor
+                    fn accessor() -> fn(&Trace) -> &[< [<$opcode_variant Table>] as Table>::Event] {
+                        Trace::[<$func_name _events>]
+                    }
                 }
             }
         )*
-    };
-}
 
-/// Implements the mapping between an [`Opcode`] and its associated
-/// [`Table`](crate::table::Table).
-///
-/// # Example
-///
-/// ```ignore
-/// define_table_registry!(
-///     (LDIEvent, LdiTable, Ldi),
-///     (RetEvent, RetTable, Ret),
-/// );
-/// ```
-macro_rules! define_table_registry {
-    (
-        $(
-            ($event_type:ty, $table_type:ty, $opcode_variant:ident)
-        ),* $(,)?
-    ) => {
-        pub fn build_table_for_opcode(
-            opcode: Opcode,
-            cs: &mut binius_m3::builder::ConstraintSystem,
-            channels: &$crate::channels::Channels,
-        ) -> Option<Box<dyn $crate::table::FillableTable>> {
-            use $crate::table::Table;
-            match opcode {
-                $(
-                    Opcode::$opcode_variant => {
-                        Some(Box::new($crate::table::TableEntry {
-                            table: Box::new(<$table_type>::new(cs, channels)),
-                            get_events: <$event_type as $crate::table::TableInfo>::accessor(),
-                        }))
-                    }
-                )*
-                _ => None,
+        paste! {
+            pub fn build_table_for_opcode(
+                opcode: Opcode,
+                cs: &mut binius_m3::builder::ConstraintSystem,
+                channels: &$crate::channels::Channels,
+            ) -> Option<Box<dyn $crate::table::FillableTable>> {
+                use $crate::table::Table;
+                match opcode {
+                    $(
+                        Opcode::$opcode_variant => {
+                            Some(Box::new($crate::table::TableEntry {
+                                table: Box::new(<[<$opcode_variant Table>]>::new(cs, channels)),
+                                get_events: <[<$opcode_variant Event>] as $crate::table::TableInfo>::accessor(),
+                            }))
+                        }
+                    )*
+                    _ => None,
+                }
             }
         }
     };
@@ -239,46 +226,23 @@ impl Trace {
 }
 
 // Generate event accessors and table info.
-impl_table_info_and_accessor!(
-    (LdiEvent, LdiTable, ldi_events, ldi),
-    (RetEvent, RetTable, ret_events, ret),
-    (BzEvent, BzTable, bz_events, bz),
-    (BnzEvent, BnzTable, bnz_events, bnz),
-    (B32MulEvent, B32MulTable, b32_mul_events, b32_mul),
-    (B128AddEvent, B128AddTable, b128_add_events, b128_add),
-    (B128MulEvent, B128MulTable, b128_mul_events, b128_mul),
-    (B32MuliEvent, B32MuliTable, b32_muli_events, b32_muli),
-    (AndiEvent, AndiTable, andi_events, andi),
-    (XoriEvent, XoriTable, xori_events, xori),
-    (AddEvent, AddTable, add_events, add),
-    (TailiEvent, TailiTable, taili_events, taili),
-    (MvvwEvent, MvvwTable, mvvw_events, mvvw),
-    (MvihEvent, MvihTable, mvih_events, mvih),
-    (AndEvent, AndTable, and_events, and),
-    (XorEvent, XorTable, xor_events, xor),
-    (OrEvent, OrTable, or_events, or),
-    (OriEvent, OriTable, ori_events, ori),
-);
-
-// Map all opcodes to their related event and table.
-define_table_registry!(
-    (LdiEvent, LdiTable, Ldi),
-    (RetEvent, RetTable, Ret),
-    // `BzEvent` is actually triggered through the `Bnz` instruction
-    (BzEvent, BzTable, Bz),
-    (BnzEvent, BnzTable, Bnz),
-    (B32MulEvent, B32MulTable, B32Mul),
-    (B128AddEvent, B128AddTable, B128Add),
-    (B128MulEvent, B128MulTable, B128Mul),
-    (B32MuliEvent, B32MuliTable, B32Muli),
-    (AddEvent, AddTable, Add),
-    (TailiEvent, TailiTable, Taili),
-    (MvvwEvent, MvvwTable, Mvvw),
-    (MvihEvent, MvihTable, Mvih),
-    (AndiEvent, AndiTable, Andi),
-    (XoriEvent, XoriTable, Xori),
-    (AndEvent, AndTable, And),
-    (XorEvent, XorTable, Xor),
-    (OrEvent, OrTable, Or),
-    (OriEvent, OriTable, Ori),
+define_table_registry_and_accessors!(
+    (ldi, Ldi),
+    (ret, Ret),
+    (bz, Bz),
+    (bnz, Bnz),
+    (b32_mul, B32Mul),
+    (b32_muli, B32Muli),
+    (b128_add, B128Add),
+    (b128_mul, B128Mul),
+    (andi, Andi),
+    (xori, Xori),
+    (add, Add),
+    (taili, Taili),
+    (mvvw, Mvvw),
+    (mvih, Mvih),
+    (and, And),
+    (xor, Xor),
+    (or, Or),
+    (ori, Ori),
 );
