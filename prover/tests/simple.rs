@@ -12,7 +12,7 @@ use rand::{Rng, SeedableRng};
 use zcrayvm_assembly::isa::GenericISA;
 use zcrayvm_prover::model::Trace;
 use zcrayvm_prover::prover::{verify_proof, Prover};
-use zcrayvm_prover::test_utils::generate_test_trace;
+use zcrayvm_prover::test_utils::generate_trace;
 
 fn test_from_trace_generator<F, G>(trace_generator: F, check_events: G) -> Result<()>
 where
@@ -111,7 +111,7 @@ fn generate_b128add_b128mul_trace(x: u128, y: u128) -> Result<Trace> {
         (19, mul_result_array[3], 1),
     ];
 
-    generate_test_trace(asm_code, init_values, vrom_writes)
+    generate_trace(asm_code, Some(init_values), Some(vrom_writes))
 }
 
 #[test]
@@ -159,9 +159,6 @@ fn generate_add_ret_trace(src1_value: u32, src2_value: u32) -> Result<Trace> {
         src1_value, src2_value
     );
 
-    // Initialize memory with return PC = 0, return FP = 0
-    let init_values = vec![0, 0];
-
     // Add VROM writes from LDI and ADD events
     let vrom_writes = vec![
         // LDI events
@@ -174,7 +171,7 @@ fn generate_add_ret_trace(src1_value: u32, src2_value: u32) -> Result<Trace> {
         (4, src1_value + src2_value, 1),
     ];
 
-    generate_test_trace(asm_code, init_values, vrom_writes)
+    generate_trace(asm_code, None, Some(vrom_writes))
 }
 
 #[test]
@@ -264,7 +261,7 @@ fn generate_simple_taili_trace(init_values: Vec<u32>) -> Result<Trace> {
         (2, 100, 1), // Return value
     ];
 
-    generate_test_trace(asm_code, init_values, vrom_writes)
+    generate_trace(asm_code, Some(init_values), Some(vrom_writes))
 }
 
 #[test]
@@ -360,9 +357,6 @@ fn generate_all_binary_ops_trace() -> Result<Trace> {
         val1, val2, imm, imm, imm, imm32
     );
 
-    // Initialize memory with return PC = 0, return FP = 0
-    let init_values = vec![0, 0];
-
     // Calculate expected results
     let and_result = val1 & val2;
     let or_result = val1 | val2;
@@ -392,7 +386,7 @@ fn generate_all_binary_ops_trace() -> Result<Trace> {
         (11, b32_muli_result, 1),
     ];
 
-    generate_test_trace(asm_code, init_values, vrom_writes)
+    generate_trace(asm_code, None, Some(vrom_writes))
 }
 
 #[test]
