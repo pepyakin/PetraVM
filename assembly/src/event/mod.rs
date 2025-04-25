@@ -43,7 +43,7 @@ pub use self::{
     jump::{JumpiEvent, JumpvEvent},
     mv::{LdiEvent, MvihEvent, MvvlEvent, MvvwEvent},
     ret::RetEvent,
-    shift::{SllEvent, SlliEvent, SraEvent, SraiEvent, SrlEvent, SrliEvent},
+    shift::{AnyShiftEvent, SllEvent, SlliEvent, SraEvent, SraiEvent, SrlEvent, SrliEvent},
 };
 
 /// An `Event` represents an instruction that can be executed by the VM.

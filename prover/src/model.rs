@@ -248,4 +248,5 @@ define_table_registry_and_accessors!(
     (ori, Ori),
     (jumpi, Jumpi),
     (jumpv, Jumpv),
+    (srli, Srli),
 );
