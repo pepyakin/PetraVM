@@ -9,6 +9,7 @@ use binius_m3::builder::B32;
 use super::FramePointer;
 #[cfg(test)]
 use crate::memory::VromPendingUpdates;
+use crate::Opcode;
 use crate::{
     assembler::LabelsFrameSizes,
     event::{
@@ -221,21 +222,39 @@ impl ZCrayTrace {
         self.vrom_mut().write(index, value)?;
         if let Some(pending_updates) = self.memory.vrom_pending_updates_mut().remove(&index) {
             for pending_update in pending_updates {
-                let (parent, opcode, field_pc, fp, timestamp, dst, dst_addr, src, offset) =
+                let (parent, opcode, field_pc, fp, timestamp, dst, dst_addr, src, offset, mvvl_pos) =
                     pending_update;
                 self.vrom_write(parent, value)?;
-                let event_out = MVEventOutput::new(
-                    opcode,
-                    field_pc,
-                    fp.into(),
-                    timestamp,
-                    dst,
-                    dst_addr,
-                    src,
-                    offset,
-                    value.to_u128(),
-                );
-                event_out.push_mv_event(self);
+                if opcode == Opcode::Mvvw {
+                    let event_out = MVEventOutput::new(
+                        opcode,
+                        field_pc,
+                        fp.into(),
+                        timestamp,
+                        dst,
+                        dst_addr,
+                        src,
+                        offset,
+                        value.to_u128(),
+                    );
+                    event_out.push_mv_event(self);
+                } else if mvvl_pos == 3 {
+                    // There is a limitation here that pos = 3 must be the last position set for
+                    // Mvvl, otherwise a vrom read error will occur.
+                    let value = self.vrom().peek::<u128>(dst_addr + offset.val() as u32)?;
+                    let event_out = MVEventOutput::new(
+                        opcode,
+                        field_pc,
+                        fp.into(),
+                        timestamp,
+                        dst,
+                        dst_addr,
+                        src,
+                        offset,
+                        value,
+                    );
+                    event_out.push_mv_event(self);
+                }
             }
         }
 
