@@ -9,7 +9,6 @@ use binius_m3::builder::B32;
 use super::FramePointer;
 #[cfg(test)]
 use crate::memory::VromPendingUpdates;
-use crate::Opcode;
 use crate::{
     assembler::LabelsFrameSizes,
     event::{
@@ -33,6 +32,7 @@ use crate::{
     gadgets::{Add32Gadget, Add64Gadget},
     isa::ISA,
     memory::{Memory, MemoryError, ProgramRom, Ram, ValueRom, VromUpdate, VromValueT},
+    Opcode,
 };
 
 #[derive(Debug, Default)]
@@ -221,11 +221,7 @@ impl ZCrayTrace {
     /// VROM.
     ///
     /// This will also execute pending VROM updates if necessary.
-    pub(crate) fn vrom_write<T: VromValueT>(
-        &mut self,
-        index: u32,
-        value: T,
-    ) -> Result<(), MemoryError> {
+    pub(crate) fn vrom_write(&mut self, index: u32, value: u32) -> Result<(), MemoryError> {
         self.vrom_mut().write(index, value)?;
         if let Some(pending_updates) = self.memory.vrom_pending_updates_mut().remove(&index) {
             for pending_update in pending_updates {
