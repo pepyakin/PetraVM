@@ -1,5 +1,6 @@
 pub mod common;
 
+use binius_field::{BinaryField, BinaryField32b, Field};
 use common::test_utils::execute_test_asm;
 use num_traits::WrappingAdd;
 
@@ -7,10 +8,16 @@ use num_traits::WrappingAdd;
 fn test_fibonacci_integration() {
     let mut cur_fibs = [0, 1];
 
+    // Use the multiplicative generator G for calculations
+    const G: BinaryField32b = BinaryField32b::MULTIPLICATIVE_GENERATOR;
+
     // Set initial value
     let init_val = 4;
 
-    let mut info = execute_test_asm(include_str!("../../examples/fib.asm"), &[init_val]);
+    let mut info = execute_test_asm(
+        include_str!("../../examples/fib.asm"),
+        &[G.pow([4_u64]).val()],
+    );
 
     // Push a frame for `fib_frame_temp`.
     let fib_frame = info.frames.add_frame("fib");
