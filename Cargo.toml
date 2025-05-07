@@ -13,7 +13,7 @@ homepage = "https://github.com/PetraProver/PetraVM"
 documentation = "https://docs.rs/petravm"
 readme = "README.md"
 keywords = ["zkvm", "zero-knowledge", "binius", "rust", "snark"]
-categories = ["cryptography", "zkvm", "snark"]
+categories = ["cryptography", "compilers", "wasm"]
 
 [workspace.dependencies]
 anyhow = "1.0"
