@@ -68,11 +68,11 @@ Expansion to include RAM-related instructions is kept for future work.
 - [ ] `SLT` - Set if less than (signed)
 - [ ] `SLTI` - Set if less than immediate (signed)
 - [x] `SLTU` - Set if less than (unsigned)
-- [ ] `SLTIU` - Set if less than immediate (unsigned)
+- [x] `SLTIU` - Set if less than immediate (unsigned)
 - [ ] `SLE` - Set if less than or equal (signed)
 - [ ] `SLEI` - Set if less than or equal immediate (signed)
-- [ ] `SLEU` - Set if less than or equal (unsigned)
-- [ ] `SLEIU` - Set if less than or equal immediate (unsigned)
+- [x] `SLEU` - Set if less than or equal (unsigned)
+- [x] `SLEIU` - Set if less than or equal immediate (unsigned)
 
 #### VROM Operations
 - [x] `LDI.W` - Load immediate word
