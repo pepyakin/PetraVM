@@ -146,7 +146,7 @@ fn test_b128_add_b128_mul() -> Result<()> {
 
 fn generate_integer_ops_trace(src1_value: u32, src2_value: u32) -> Result<Trace> {
     let imm = src2_value as u16;
-    // Create a simple assembly program with LDI, ADD and RET
+    // Create a simple assembly program with all integer operations.
     // Note: Format follows the grammar requirements:
     // - Program must start with a label followed by an instruction
     // - Used framesize for stack allocation
@@ -158,8 +158,9 @@ fn generate_integer_ops_trace(src1_value: u32, src2_value: u32) -> Result<Trace>
             ;; Skip @4 to test a gap in vrom writes
             ADD @5, @2, @3\n\
             ADDI @6, @2, #{}\n\
-            MUL @8, @2, @3\n\
-            MULI @10, @2, #{}\n\
+            MULU @8, @2, @3\n\
+            MUL @10, @2, @3\n\
+            MULI @12, @2, #{}\n\
             RET\n",
         src1_value, src2_value, imm, imm
     );
@@ -198,9 +199,9 @@ fn test_integer_ops() -> Result<()> {
                 "Should have exactly one RET event"
             );
             assert_eq!(
-                trace.b32_mul_events().len(),
-                0,
-                "Shouldn't have any B32_MUL event"
+                trace.mulu_events().len(),
+                1,
+                "Should have exacly one MULU event"
             );
         },
     )
