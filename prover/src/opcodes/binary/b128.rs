@@ -2,8 +2,6 @@
 //!
 //! This module contains tables for binary field arithmetic operations.
 
-use std::any::Any;
-
 use binius_field::underlier::Divisible;
 use binius_m3::builder::{
     upcast_expr, Col, ConstraintSystem, TableFiller, TableId, TableWitnessSegment, B128, B32,
@@ -208,10 +206,6 @@ impl Table for B128AddTable {
             dst_abs_addr,
         }
     }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
 impl_b128_table_filler!(B128AddTable, B128AddEvent);
@@ -332,10 +326,6 @@ impl Table for B128MulTable {
             src2_abs_addr,
             dst_abs_addr,
         }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

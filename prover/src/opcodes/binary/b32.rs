@@ -2,8 +2,6 @@
 //!
 //! This module contains tables for binary field arithmetic operations.
 
-use std::any::Any;
-
 use binius_field::Field;
 use binius_m3::builder::{
     upcast_col, upcast_expr, Col, ConstraintSystem, TableFiller, TableId, TableWitnessSegment, B1,
@@ -158,10 +156,6 @@ impl Table for B32MulTable {
             dst_abs_addr,
         }
     }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
 impl_b32_table_filler!(B32MulTable, B32MulEvent);
@@ -229,10 +223,6 @@ impl Table for XorTable {
             dst_abs_addr,
             dst_val,
         }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -306,10 +296,6 @@ impl Table for AndTable {
             dst_abs_addr,
             dst_val,
         }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -386,10 +372,6 @@ impl Table for OrTable {
             dst_abs_addr,
             dst_val,
         }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -477,10 +459,6 @@ impl Table for OriTable {
             dst_val,
             dst_val_unpacked,
         }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -571,10 +549,6 @@ impl Table for XoriTable {
             src_abs,
             src_val,
         }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -670,10 +644,6 @@ impl Table for AndiTable {
             src_val_unpacked,
             src_val_low,
         }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -819,10 +789,6 @@ impl Table for B32MuliTable {
             second_instruction_pc,
             imm_high,
         }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
