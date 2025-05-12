@@ -242,6 +242,7 @@ define_table_registry_and_accessors!(
     (mulu, Mulu),
     (mul, Mul),
     (muli, Muli),
+    (mulsu, Mulsu),
     (taili, Taili),
     (tailv, Tailv),
     (calli, Calli),
