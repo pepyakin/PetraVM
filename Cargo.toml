@@ -33,4 +33,4 @@ binius_m3 = { git = "https://github.com/IrreducibleOSS/binius.git", rev = "2aac4
 binius_utils = { git = "https://github.com/IrreducibleOSS/binius.git", rev = "2aac402f261a2b7fd59a563d97f5884087c15c6a" }
 
 [profile.release]
-lto = "fat"
+lto = "thin"
